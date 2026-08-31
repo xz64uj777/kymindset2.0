@@ -25,7 +25,6 @@ jobs:
               tr -d '\r\n' < "$f" | head -c 8000 >> /tmp/head.b64
             done
 
-            # Rebuilt, verified compressed head + the already verified tail.
             {
               for f in .source_chunks/head{01..05}.gz.b64; do
                 tr -d '\r\n' < "$f"
@@ -40,13 +39,17 @@ jobs:
             cat /tmp/head.b64 /tmp/tail.b64 > /tmp/source.b64
             base64 -d /tmp/source.b64 > /tmp/source.zip
 
-            echo "7414f883588018be276642e2ea99899936ddef2bd3b12be536976c9347693fab  /tmp/source.zip" | sha256sum -c -
-
+            unzip -tq /tmp/source.zip
             rm -rf /tmp/source-unpack
             mkdir -p /tmp/source-unpack
             unzip -q /tmp/source.zip -d /tmp/source-unpack
             test -f /tmp/source-unpack/kysmindset-main/package.json
             test -f /tmp/source-unpack/kysmindset-main/android/app/build.gradle
+
+            cd /tmp/source-unpack/kysmindset-main
+            ACTUAL_MANIFEST=$(find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
+            test "$ACTUAL_MANIFEST" = "c562299f4e87c2240248346b06679b57f3e5804f82a2e9a78c7c72e64509ca8a"
+            cd "$GITHUB_WORKSPACE"
 
             rsync -a --exclude='.github/workflows/android-apk.yml' /tmp/source-unpack/kysmindset-main/ ./
             rm -rf .source_chunks node_modules
