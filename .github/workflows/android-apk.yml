@@ -25,11 +25,11 @@ jobs:
               tr -d '\r\n' < "$f" | head -c 8000 >> /tmp/head.b64
             done
 
-            # tail01 was transferred one character short; the verified missing
-            # boundary character is restored before the remaining tail pieces.
+            # Rebuilt, verified compressed head + the already verified tail.
             {
-              tr -d '\r\n' < .source_chunks/tail01.gz.b64
-              printf 'O'
+              for f in .source_chunks/head{01..05}.gz.b64; do
+                tr -d '\r\n' < "$f"
+              done
               for f in .source_chunks/tail{02..16}.gz.b64; do
                 tr -d '\r\n' < "$f"
               done
