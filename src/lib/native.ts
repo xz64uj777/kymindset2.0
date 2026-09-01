@@ -101,6 +101,22 @@ function androidBridge(): AndroidBridge | null {
   return a ?? null;
 }
 
+let nativePromptUntil = 0;
+
+function beginNativePrompt(ms = 120_000) {
+  nativePromptUntil = Math.max(nativePromptUntil, Date.now() + ms);
+}
+
+function endNativePromptSoon() {
+  window.setTimeout(() => {
+    nativePromptUntil = 0;
+  }, 1500);
+}
+
+export function isNativePromptActive() {
+  return Date.now() < nativePromptUntil;
+}
+
 export type DeviceApp = { pkg: string; name: string };
 
 export type DevicePosture = {
@@ -184,6 +200,7 @@ export async function setDeviceKill(
     const finish = (v: "on" | "off" | "denied" | "app") => {
       if (done) return;
       done = true;
+      endNativePromptSoon();
       resolve(v);
     };
     const onEvt = (e: Event) => {
@@ -193,6 +210,7 @@ export async function setDeviceKill(
     };
     window.addEventListener("kys-kill", onEvt, { once: true });
     try {
+      if (on) beginNativePrompt();
       setKill(on);
     } catch {
       finish("denied");
@@ -362,6 +380,7 @@ export async function verifyBiometric(): Promise<"ok" | "fail" | "unavailable"> 
       };
       const on = (e: Event) => {
         const d = String((e as CustomEvent).detail ?? "");
+        endNativePromptSoon();
         finish(d === "ok" || d === "unavailable" ? d : "fail");
       };
       window.addEventListener("kys-bio", on, { once: true });
@@ -371,6 +390,7 @@ export async function verifyBiometric(): Promise<"ok" | "fail" | "unavailable"> 
       }, 90_000);
     });
     try {
+      beginNativePrompt(90_000);
       android.biometric();
     } catch {
       return "unavailable";

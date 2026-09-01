@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
 import type { IntelSection, TabId } from "@/lib/security/types";
 import { useSecurity } from "@/lib/security/store";
-import { isStandalone, requestWakeLock, setAppBadge } from "@/lib/native";
+import { isNativePromptActive, isStandalone, requestWakeLock, setAppBadge } from "@/lib/native";
 import { cn, timeAgo } from "@/lib/utils";
 import { BgField, StatusDot } from "./chrome";
 import { DecisionDialog, SosDialog } from "./dialogs";
@@ -85,7 +85,7 @@ export function Dashboard() {
   useEffect(() => {
     if (settings.autoLock === false) return;
     const onVis = () => {
-      if (document.visibilityState === "hidden" && isStandalone()) lock();
+      if (document.visibilityState === "hidden" && isStandalone() && !isNativePromptActive()) lock();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);

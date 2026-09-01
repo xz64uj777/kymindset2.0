@@ -201,3 +201,19 @@ test("app-owned storage synchronization is not labeled as intrusion", () => {
   assert.match(store, /falseStorageRewrite/);
   assert.match(config, /"External"/);
 });
+
+
+test("mindset actions reveal their result instead of acting invisibly", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.match(overview, /scrollToPanel\("Security Analysis Engine"\)/);
+  assert.match(overview, /scrollToPanel\("Protection state"\)/);
+  assert.match(overview, /scrollToPanel\("Actions"\)/);
+});
+
+test("Android permission sheets do not trigger standalone auto-lock", () => {
+  const native = read("src/lib/native.ts");
+  const dashboard = read("src/components/security/dashboard.tsx");
+  assert.match(native, /export function isNativePromptActive/);
+  assert.match(native, /beginNativePrompt\(\)/);
+  assert.match(dashboard, /!isNativePromptActive\(\)/);
+});

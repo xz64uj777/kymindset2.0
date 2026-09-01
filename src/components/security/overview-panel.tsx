@@ -60,6 +60,12 @@ export function OverviewPanel() {
     },
   ];
 
+  const scrollToPanel = (title: string) => {
+    const sections = Array.from(document.querySelectorAll("section"));
+    const target = sections.find((section) => section.querySelector("h3")?.textContent?.trim() === title);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const copySnapshot = async () => {
     const text = [
       `Kysmindset ${score.grade} ${score.score} · ${score.label}`,
@@ -124,28 +130,45 @@ export function OverviewPanel() {
               detail: "Collect only what this app or Android can actually see.",
               action: scanning ? "Analyzing…" : "Run analysis",
               disabled: scanning,
-              onClick: () => void runSecurityAnalysis(),
+              onClick: () => {
+                void runSecurityAnalysis();
+                window.setTimeout(() => scrollToPanel("Security Analysis Engine"), 60);
+              },
             },
             {
               title: "Verify",
               detail: "Unknown means review — never automatically malware.",
               action: "Review network",
               disabled: false,
-              onClick: () => setTab("network"),
+              onClick: () => {
+                setTab("network");
+                toast.message("Review unknown and suspicious network activity before deciding.");
+              },
             },
             {
               title: "Control",
               detail: "Allow, block, lockdown, or cut traffic deliberately.",
               action: killSwitch ? "Open controls" : "Start protection",
               disabled: false,
-              onClick: () => (killSwitch ? setTab("network") : toggleKillSwitch()),
+              onClick: () => {
+                if (!killSwitch) {
+                  toggleKillSwitch();
+                  toast.message("Starting protection — approve Android VPN if prompted.");
+                } else {
+                  scrollToPanel("Protection state");
+                  toast.message("Protection is active. Use Stop Protection or Network for detailed controls.");
+                }
+              },
             },
             {
               title: "Recover",
-              detail: "Keep lock, update, and protection state easy to restore.",
-              action: "Open recovery",
+              detail: "Return to a known-good state without silently disabling protection.",
+              action: "Recovery actions",
               disabled: false,
-              onClick: () => setTab("config"),
+              onClick: () => {
+                scrollToPanel("Actions");
+                toast.message("Recovery actions are below: release protection, clear resolved items, or refresh monitors.");
+              },
             },
           ].map(({ title, detail, action, disabled, onClick }) => (
             <button
