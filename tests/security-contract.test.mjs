@@ -217,3 +217,23 @@ test("Android permission sheets do not trigger standalone auto-lock", () => {
   assert.match(native, /beginNativePrompt\(\)/);
   assert.match(dashboard, /!isNativePromptActive\(\)/);
 });
+
+
+test("native VPN permission activity does not trip device-lock pause gate", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(main, /suppressNextPauseGate/);
+  assert.match(main, /if \(suppressNextPauseGate\)/);
+  assert.match(main, /suppressNextPauseGate = true;[\s\S]*startActivityForResult\(prep, VPN_REQ\)/);
+});
+
+test("network traffic rows expose allow block details and end controls", () => {
+  const row = read("src/components/security/activity-row.tsx");
+  const engine = read("src/lib/security/engine.ts");
+  const store = read("src/lib/security/store.ts");
+  assert.match(row, /Allow this host for future requests/);
+  assert.match(row, /Block this host/);
+  assert.match(row, /More options/);
+  assert.match(row, /End this connection/);
+  assert.match(engine, /export function unblockHost/);
+  assert.match(store, /unblockHost\(a\.destination\)/);
+});

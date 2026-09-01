@@ -39,6 +39,7 @@ public class MainActivity extends FragmentActivity {
     private static final int ADMIN_REQ = 92;
     private WebView web;
     private boolean gated = true;
+    private boolean suppressNextPauseGate = false;
 
     public static void requestLock(Context ctx) {
         Intent i = new Intent(ctx, MainActivity.class);
@@ -217,6 +218,10 @@ public class MainActivity extends FragmentActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        if (suppressNextPauseGate) {
+            suppressNextPauseGate = false;
+            return;
+        }
         if (LockGateService.deviceLockOn(this) && !gated) {
             gated = true;
             sendEvent("kys-gate", "lock");
@@ -361,6 +366,7 @@ public class MainActivity extends FragmentActivity {
                     }
                     Intent prep = VpnService.prepare(MainActivity.this);
                     if (prep != null) {
+                        suppressNextPauseGate = true;
                         startActivityForResult(prep, VPN_REQ);
                     } else {
                         startVpn();
@@ -392,7 +398,10 @@ public class MainActivity extends FragmentActivity {
         @JavascriptInterface
         public void requestAdmin() {
             runOnUiThread(
-                () -> startActivityForResult(DeviceOwner.adminAddIntent(MainActivity.this), ADMIN_REQ));
+                () -> {
+                    suppressNextPauseGate = true;
+                    startActivityForResult(DeviceOwner.adminAddIntent(MainActivity.this), ADMIN_REQ);
+                });
         }
 
         @JavascriptInterface

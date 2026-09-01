@@ -164,6 +164,39 @@ export function ActivityRow({
               </Chip>
             </>
           ) : null}
+          {item.type === "traffic" && !needsDecision ? (
+            <>
+              {dead ? (
+                <Chip
+                  title="Allow this host for future requests"
+                  onClick={() => {
+                    allow(item.id);
+                    toast.success(`Allowed ${item.name} for future requests`);
+                  }}
+                  className="text-emerald border-emerald/25 bg-emerald-dim"
+                >
+                  <Check className="size-3" />
+                  Allow
+                </Chip>
+              ) : (
+                <Chip
+                  title="Block this host"
+                  onClick={() => {
+                    block(item.id);
+                    toast.success(`Blocked ${item.name}`);
+                  }}
+                  className="text-red border-red/25 bg-red-dim"
+                >
+                  <Ban className="size-3" />
+                  Block
+                </Chip>
+              )}
+              <Chip title="More options" onClick={() => setPending(item)} className="text-cyan border-cyan/25 bg-cyan-dim">
+                <Info className="size-3" />
+                Details
+              </Chip>
+            </>
+          ) : null}
           {item.type === "process" && item.status === "paused" ? (
             <Chip
               title="Resume process"

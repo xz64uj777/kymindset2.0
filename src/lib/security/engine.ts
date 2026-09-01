@@ -301,6 +301,12 @@ export function blockHost(host: string) {
   applyGuard({ ...guard, blocked: [...blockedHosts] });
 }
 
+export function unblockHost(host: string) {
+  if (!host) return;
+  blockedHosts.delete(host);
+  applyGuard({ ...guard, blocked: [...blockedHosts] });
+}
+
 export function blockedHostList() {
   return [...blockedHosts];
 }

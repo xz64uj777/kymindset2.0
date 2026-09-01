@@ -20,6 +20,7 @@ import {
   sampleResources,
   snapshotPosture,
   unregisterGuardWorker,
+  unblockHost,
 } from "./engine";
 import type {
   AllowItem,
@@ -435,12 +436,14 @@ export const useSecurity = create<SecurityState>()(
       allow: (id) => {
         const a = get().activities.find((x) => x.id === id);
         if (!a) return;
+        if (a.type === "traffic" && a.destination) unblockHost(a.destination);
         set({
           activities: get().activities.map((x) =>
             x.id === id ? { ...x, status: "allowed" as const, resolveNote: "Allowed by user" } : x,
           ),
           history: pushHistory(get().history, "Allowed", a.name, a.details),
         });
+        syncGuardFrom(get);
       },
       block: (id, note = "Blocked by user") => {
         const a = get().activities.find((x) => x.id === id);
