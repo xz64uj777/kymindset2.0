@@ -15,21 +15,6 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Align unified scan result contracts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/align_scan_result_contracts.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/security-contract.test.mjs
-          if ! git diff --cached --quiet; then
-            git commit -m "Align tests with unified scan results [skip ci]"
-            git push origin HEAD:main
-          fi
-
       - name: Validate source tree
         shell: bash
         run: |
