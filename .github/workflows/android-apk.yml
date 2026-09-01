@@ -68,6 +68,14 @@ jobs:
               '{ name: "PBKDF2", hash: "SHA-256", salt: toArrayBuffer(salt), iterations: ITERATIONS },'
           )
           auth.write_text(text)
+
+          main = Path('android/app/src/main/java/app/kysmindset/security/MainActivity.java')
+          text = main.read_text()
+          text = text.replace(
+              'WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);',
+              'WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0);'
+          )
+          main.write_text(text)
           PY
 
       - name: Normalize imported source
