@@ -189,3 +189,15 @@ test("overview exposes working protection and mindset actions", () => {
   assert.match(overview, /Review network/);
   assert.match(overview, /Open recovery/);
 });
+
+
+test("app-owned storage synchronization is not labeled as intrusion", () => {
+  const engine = read("src/lib/security/engine.ts");
+  const store = read("src/lib/security/store.ts");
+  const config = read("src/components/security/config-panel.tsx");
+  assert.match(engine, /appOwnedStorageKeys/);
+  assert.match(engine, /appOwnedStorageKeys\.has\(e\.key\)/);
+  assert.doesNotMatch(engine, /cause: `Security store rewritten from another tab/);
+  assert.match(store, /falseStorageRewrite/);
+  assert.match(config, /"External"/);
+});

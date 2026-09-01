@@ -429,12 +429,21 @@ export async function bootEngine() {
   window.setInterval(() => {
     longTasks = Math.max(0, longTasks - 1);
   }, 2000);
+  const appOwnedStorageKeys = new Set([
+    "kysmindset-v4",
+    "kysmindset-v5",
+    "kysmindset-webauthn",
+    "kysmindset-hide-install-v2",
+  ]);
   window.addEventListener("storage", (e) => {
     if (!e.key || !e.key.startsWith("kysmindset")) return;
+    // The storage event only fires in a different same-origin document.
+    // Known Kysmindset keys are normal app synchronization, not evidence of intrusion.
+    if (appOwnedStorageKeys.has(e.key)) return;
     emit({
       type: "tamper",
-      target: "Kysmindset",
-      cause: `Security store rewritten from another tab (${e.key})`,
+      target: "Kysmindset storage",
+      cause: `Unexpected Kysmindset-prefixed storage key changed in another context (${e.key})`,
       at: Date.now(),
     });
   });

@@ -264,12 +264,20 @@ export const useSecurity = create<SecurityState>()(
             (typeof sessionStorage !== "undefined" &&
               sessionStorage.getItem(UNLOCK_KEY) === "1") ||
             !authConfigured();
+          const falseStorageRewrite = (event: TamperEvent) =>
+            event.cause.startsWith("Security store rewritten from another tab (");
+          const tamperLog = (get().tamperLog ?? []).filter((event) => !falseStorageRewrite(event));
+          const previousLastTamper = get().lastTamper ?? null;
+          const lastTamper =
+            previousLastTamper && falseStorageRewrite(previousLastTamper)
+              ? tamperLog[0] ?? null
+              : previousLastTamper;
           set({
             hydrated: true,
             unlocked,
             connection: readConnection(),
-            tamperLog: get().tamperLog ?? [],
-            lastTamper: get().lastTamper ?? null,
+            tamperLog,
+            lastTamper,
           });
           void bootEngine().then(async () => {
             syncGuardFrom(get);

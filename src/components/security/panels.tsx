@@ -1095,7 +1095,7 @@ function TamperLog() {
       {events.slice(0, 8).map((e) => (
         <div key={e.id} className="flex gap-2 text-micro">
           <span className={e.actor === "intruder" ? "text-rose" : "text-amber"}>
-            {e.actor === "intruder" ? "Intruder" : "You"}
+            {e.actor === "intruder" ? "External" : "You"}
           </span>
           <span className="min-w-0 flex-1 truncate text-muted">{e.cause}</span>
           <span className="shrink-0 font-mono text-2xs text-subtle">{timeAgo(e.at)}</span>

@@ -256,7 +256,7 @@ export function Dashboard() {
             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber" />
             <div className="min-w-0">
               <p className="text-xs font-medium text-amber">
-                Tamper protection blocked {lastTamper.actor === "intruder" ? "an intrusion" : "your action"}
+                Tamper protection blocked {lastTamper.actor === "intruder" ? "an external change" : "your action"}
               </p>
               <p className="text-micro text-muted">
                 {lastTamper.cause} · {timeAgo(lastTamper.at)}
