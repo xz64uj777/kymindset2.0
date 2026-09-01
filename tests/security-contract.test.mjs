@@ -187,7 +187,7 @@ test("overview exposes working protection and mindset actions", () => {
   assert.match(overview, /toggleKillSwitch/);
   assert.match(overview, /Run analysis/);
   assert.match(overview, /Review network/);
-  assert.match(overview, /Open recovery/);
+  assert.match(overview, /Recovery actions/);
 });
 
 
