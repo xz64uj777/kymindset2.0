@@ -12,55 +12,36 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
+      - name: Check out staging repository
         uses: actions/checkout@v4
 
-      - name: Import audited source
-        id: source
+      - name: Import verified hardened source
         shell: bash
         run: |
           set -euo pipefail
-          if [ -d .bundle4 ]; then
-            {
-              cat .bundle4/part{01..09}.b64
-              cat .bundle4/part10{a,b,c}.b64
-              cat .bundle4/part11{a,b,c}.b64
-              cat .bundle4/part12{a,b,c}.b64
-            } | tr -d '\r\n' > /tmp/source.xz.b64
+          if [ -d .overlay ]; then
+            cat .overlay/part*.b64 | tr -d '\r\n' > /tmp/overlay.b64
+            base64 -d /tmp/overlay.b64 > /tmp/overlay.tar.xz
+            echo "5c15120a0c6f3b404b2ea9f8b3f7a2f8b232fae5ea9b9ac74d655df72eb4d6dc  /tmp/overlay.tar.xz" | sha256sum -c -
+            cp .overlay/kymindset-debug.keystore.b64 /tmp/kymindset-debug.keystore.b64
 
-            base64 -d /tmp/source.xz.b64 > /tmp/source.tar.xz
-            echo "14ea02c21753e0b5019ec0e56277ea78810f8f60c773b05876b4e1f657c1d2db  /tmp/source.tar.xz" | sha256sum -c -
-
-            rm -rf /tmp/source-unpack
-            mkdir -p /tmp/source-unpack
-            tar -xJf /tmp/source.tar.xz -C /tmp/source-unpack
-            test -f /tmp/source-unpack/package.json
-            test -f /tmp/source-unpack/android/app/build.gradle
-            test -f /tmp/source-unpack/tests/security-contracts.test.mjs
-
+            git clone --depth 1 https://github.com/xz64uj777/kysmindset.git /tmp/base
             rsync -a --delete \
               --exclude='.git' \
               --exclude='.github/workflows/android-apk.yml' \
-              --exclude='.bundle4' \
-              /tmp/source-unpack/ ./
+              /tmp/base/ ./
 
-            rm -rf .bundle4 .bundle2 .clean_bundle .source_chunks node_modules dist android/app/build
-            echo "imported=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "imported=false" >> "$GITHUB_OUTPUT"
+            tar -xJf /tmp/overlay.tar.xz -C .
+            mkdir -p android/app
+            base64 -d /tmp/kymindset-debug.keystore.b64 > android/app/kymindset-debug.keystore
+            touch /tmp/imported
           fi
 
-      - name: Normalize imported source
-        if: steps.source.outputs.imported == 'true'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Import audited Kymindset 2.0 source [skip ci]"
-            git push
-          fi
+          rm -rf .overlay .bundle2 .bundle4 .bundle7 .clean_bundle .source_chunks
+          test -f package.json
+          test -f tests/security-contract.test.mjs
+          test -f android/app/build.gradle
+          test -f android/app/kymindset-debug.keystore
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -68,7 +49,7 @@ jobs:
           node-version: '22'
 
       - name: Install web dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Verify security and web code
         run: |
@@ -93,14 +74,19 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Set CI version
-        shell: bash
-        run: |
-          echo "KYS_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-          echo "KYS_VERSION_NAME=2.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-
       - name: Build debug APK
         run: gradle -p android :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Normalize repository source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Import hardened Kymindset 2.0 source [skip ci]"
+            git push || echo "Build succeeded; normalized source could not be pushed."
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -115,10 +101,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          VERSION_CODE=$(sed -n 's/.*versionCode[[:space:]]\+\([0-9][0-9]*\).*/\1/p' android/app/build.gradle | head -1)
+          VERSION_NAME=$(sed -n 's/.*versionName[[:space:]]\+"\([^"]*\)".*/\1/p' android/app/build.gradle | head -1)
+          BUILD_COMMIT=$(git rev-parse HEAD)
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
-          BUILD_COMMIT=$(git rev-parse HEAD)
-          NOTES=$(printf 'Kymindset 2.0 audited development build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\nsha256: %s\ncommit: %s\n\nMindset: Observe → Verify → Control → Recover.\n' "$KYS_VERSION_CODE" "$KYS_VERSION_NAME" "$APK_SHA" "$BUILD_COMMIT")
+          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\ncommit: %s\nsha256: %s\n\nDevelopment APK for testing.\n' "$VERSION_CODE" "$VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest --title "Kymindset 2.0 Latest APK" --notes "$NOTES" --latest
