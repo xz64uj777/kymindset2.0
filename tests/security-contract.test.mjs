@@ -206,7 +206,7 @@ test("app-owned storage synchronization is not labeled as intrusion", () => {
 test("mindset actions reveal their result instead of acting invisibly", () => {
   const overview = read("src/components/security/overview-panel.tsx");
   assert.match(overview, /scrollToPanel\("Security Analysis Engine"\)/);
-  assert.match(overview, /scrollToPanel\("Protection state"\)/);
+  assert.match(overview, /setTab\("network"\)/);
   assert.match(overview, /scrollToPanel\("Actions"\)/);
 });
 
