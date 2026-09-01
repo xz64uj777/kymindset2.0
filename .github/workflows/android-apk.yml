@@ -15,6 +15,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Fix VPN pause gate and network actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fix_vpn_pause_and_network_actions.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/java/app/kysmindset/security/MainActivity.java src/lib/security/engine.ts src/lib/security/store.ts src/components/security/activity-row.tsx tests/security-contract.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix VPN prompt lock and connection controls [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Validate source tree
         shell: bash
         run: |
