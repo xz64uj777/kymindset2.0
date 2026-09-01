@@ -74,12 +74,6 @@ export function ConfigPanel() {
           />
           <TamperLog />
           <ToggleRow
-            title="Auto-Lockdown"
-            desc="Automatically block known tracker findings discovered during analysis"
-            checked={settings.autoLockdown}
-            onChange={(v) => patch({ autoLockdown: v })}
-          />
-          <ToggleRow
             title="Auto-Lock"
             desc="Lock when you leave the installed app (home-screen mode)"
             checked={settings.autoLock !== false}

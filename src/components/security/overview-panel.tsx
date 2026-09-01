@@ -6,6 +6,7 @@ import { isDeviceVpnActive } from "@/lib/native";
 import { useScore, useSecurity } from "@/lib/security/store";
 import { cn, timeAgo } from "@/lib/utils";
 import { Panel, PanelHeader, ScoreTone, StatusDot } from "./chrome";
+import { ActivityRow } from "./activity-row";
 
 export function OverviewPanel() {
   const activities = useSecurity((s) => s.activities);
@@ -20,6 +21,10 @@ export function OverviewPanel() {
   const scanLog = useSecurity((s) => s.scanLog);
   const killSwitch = useSecurity((s) => s.killSwitch);
   const toggleKillSwitch = useSecurity((s) => s.toggleKillSwitch);
+  const deepScan = useSecurity((s) => s.deepScan);
+  const deepScanning = useSecurity((s) => s.deepScanning);
+  const runDeepScan = useSecurity((s) => s.runDeepScan);
+  const autoFixScan = useSecurity((s) => s.autoFixScan);
   const setTab = useSecurity((s) => s.setTab);
   const score = useScore();
   const tone = ScoreTone(score.status);
@@ -31,8 +36,20 @@ export function OverviewPanel() {
     return () => window.clearInterval(id);
   }, [killSwitch]);
   const threats = activities.filter((a) => a.status === "suspicious");
+  const reviewItems = activities.filter((a) => a.status === "unknown");
+  const openItems = [...threats, ...reviewItems];
   const blocked = activities.filter((a) => a.status === "blocked" || a.status === "killed");
   const allowed = activities.filter((a) => a.status === "allowed");
+  const autoFixable =
+    threats.filter((a) => a.type === "traffic").length +
+    honeypots.filter((h) => !h.armed).length +
+    Number(!settings.tamperProtection);
+  const weakenedCount = deepScan?.vulnerabilities.length ?? 0;
+  const scanHeadline = threats.length
+    ? "Alerts found"
+    : reviewItems.length || weakenedCount
+      ? "Protection weakened"
+      : "No action needed";
   const dims = [
     {
       name: "Network Exposure",
@@ -122,69 +139,19 @@ export function OverviewPanel() {
         </p>
       </Panel>
       <Panel>
-        <PanelHeader icon={<Radar className="size-4" />} title="Mindset" subtitle="Observe → verify → control → recover" />
-        <div className="grid gap-2 sm:grid-cols-4">
-          {[
-            {
-              title: "Observe",
-              detail: "Collect only what this app or Android can actually see.",
-              action: scanning ? "Analyzing…" : "Run analysis",
-              disabled: scanning,
-              onClick: () => {
-                void runSecurityAnalysis();
-                window.setTimeout(() => scrollToPanel("Security Analysis Engine"), 60);
-              },
-            },
-            {
-              title: "Verify",
-              detail: "Unknown means review — never automatically malware.",
-              action: "Review network",
-              disabled: false,
-              onClick: () => {
-                setTab("network");
-                toast.message("Review unknown and suspicious network activity before deciding.");
-              },
-            },
-            {
-              title: "Control",
-              detail: "Choose allow, block, protection, or emergency containment deliberately.",
-              action: "Open controls",
-              disabled: false,
-              onClick: () => {
-                setTab("network");
-                toast.message("Controls opened — review the evidence, then choose Allow, Block, End, or emergency protection.");
-              },
-            },
-            {
-              title: "Recover",
-              detail: "Return to a known-good state without silently disabling protection.",
-              action: "Recovery actions",
-              disabled: false,
-              onClick: () => {
-                scrollToPanel("Actions");
-                toast.message("Recovery actions are below: release protection, clear resolved items, or refresh monitors.");
-              },
-            },
-          ].map(({ title, detail, action, disabled, onClick }) => (
-            <button
-              key={title}
-              type="button"
-              disabled={disabled}
-              onClick={onClick}
-              className="rounded-md border border-line bg-elevated p-3 text-left transition-colors hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
-            >
-              <div className="text-xs font-semibold text-fg">{title}</div>
-              <div className="mt-1 text-2xs leading-relaxed text-subtle">{detail}</div>
-              <div className="mt-2 text-2xs font-medium text-cyan">{action} →</div>
-            </button>
-          ))}
-        </div>
-      </Panel>
-      <Panel>
-        <PanelHeader icon={<Radar className="size-4" />} title="Security Analysis Engine" subtitle="Rule-based posture analysis" />
+        <PanelHeader icon={<Radar className="size-4" />} title="Security Scan" subtitle="Scan first; decide from one result screen" />
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => void runSecurityAnalysis()} disabled={scanning}>
-            {scanning ? "Scanning..." : "Run Security Analysis"}
+          <Button
+            size="sm"
+            onClick={() => {
+              void runSecurityAnalysis().then(() => {
+                runDeepScan();
+                window.setTimeout(() => scrollToPanel("Scan Results"), 100);
+              });
+            }}
+            disabled={scanning || deepScanning}
+          >
+            {scanning ? "Scanning..." : "Run Security Scan"}
           </Button>
           {lastScan ? <span className="text-micro text-subtle">Last scan {timeAgo(lastScan)}</span> : null}
         </div>
@@ -194,6 +161,91 @@ export function OverviewPanel() {
           {killSwitch ? " · Network guard" : ""} · {allowlist.length} trusted · {indicators.length} learned indicators
         </p>
       </Panel>
+      {lastScan ? (
+        <Panel>
+          <PanelHeader
+            icon={<ShieldAlert className="size-4" />}
+            title="Scan Results"
+            subtitle="Everything that needs a decision stays here"
+          />
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-md border border-line bg-elevated p-3">
+              <div className="text-2xs uppercase tracking-wide text-subtle">Status</div>
+              <div className={cn("mt-1 text-sm font-semibold", threats.length ? "text-rose" : reviewItems.length || weakenedCount ? "text-amber" : "text-emerald")}>
+                {scanHeadline}
+              </div>
+            </div>
+            <div className="rounded-md border border-line bg-elevated p-3">
+              <div className="text-2xs uppercase tracking-wide text-subtle">Alerts</div>
+              <div className={cn("mt-1 text-sm font-semibold", threats.length ? "text-rose" : "text-emerald")}>{threats.length}</div>
+            </div>
+            <div className="rounded-md border border-line bg-elevated p-3">
+              <div className="text-2xs uppercase tracking-wide text-subtle">Needs review / weakened</div>
+              <div className={cn("mt-1 text-sm font-semibold", reviewItems.length || weakenedCount ? "text-amber" : "text-emerald")}>
+                {reviewItems.length + weakenedCount}
+              </div>
+            </div>
+          </div>
+
+          {deepScanning ? <p className="mt-3 text-xs text-muted">Building the final posture summary…</p> : null}
+
+          {openItems.length ? (
+            <div className="mt-4 space-y-2">
+              <div className="text-xs font-semibold text-fg">Alerts & review items</div>
+              {openItems.slice(0, 4).map((item) => (
+                <ActivityRow key={item.id} item={item} />
+              ))}
+              {openItems.length > 4 ? (
+                <button type="button" onClick={() => setTab("network")} className="text-xs font-medium text-cyan hover:underline">
+                  Review all {openItems.length} manually →
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-md border border-emerald/20 bg-emerald-dim/30 px-3 py-2 text-xs text-emerald">
+              No open network findings need a decision.
+            </p>
+          )}
+
+          {deepScan?.vulnerabilities.length ? (
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-semibold text-fg">Weakened areas</div>
+              <div className="space-y-1.5">
+                {deepScan.vulnerabilities.slice(0, 5).map((v) => (
+                  <div key={`${v.name}-${v.severity}`} className="flex items-start justify-between gap-3 rounded-md border border-line bg-elevated px-3 py-2 text-xs">
+                    <span className="text-muted">{v.name}</span>
+                    <span className="shrink-0 uppercase text-2xs text-amber">{v.severity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={autoFixable === 0}
+              onClick={() => {
+                const result = autoFixScan();
+                runDeepScan();
+                if (result.fixed) {
+                  toast.success(`Auto Fix corrected ${result.fixed} safe item${result.fixed === 1 ? "" : "s"}.${result.manual ? ` ${result.manual} still need manual review.` : ""}`);
+                } else {
+                  toast.message("No safe automatic fixes are available for the remaining items.");
+                }
+              }}
+            >
+              Auto Fix{autoFixable ? ` (${autoFixable})` : ""}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setTab("network")} disabled={openItems.length === 0}>
+              Review all manually
+            </Button>
+          </div>
+          <p className="mt-2 text-2xs text-subtle">
+            Auto Fix only changes reversible Kymindset-owned controls and blocks confirmed tracker findings. Unknown hosts, Android settings, root/debugger signals, and emergency lockdown remain manual.
+          </p>
+        </Panel>
+      ) : null}
       <Panel>
         <PanelHeader icon={<Terminal className="size-4" />} title="Live feed" subtitle="Engine output while a scan runs" />
         <ScanFeed log={scanLog} scanning={scanning} />
@@ -300,6 +352,7 @@ function QuickActions() {
   const setTab = useSecurity((s) => s.setTab);
   const activities = useSecurity((s) => s.activities);
   const pending = activities.filter((a) => a.status === "suspicious" || a.status === "unknown");
+  const threats = activities.filter((a) => a.status === "suspicious");
   const resolved = activities.filter(
     (a) => a.status === "blocked" || a.status === "killed" || a.status === "resolved",
   ).length;
@@ -322,12 +375,12 @@ function QuickActions() {
     },
     {
       key: "block",
-      label: "Block open items",
-      desc: pending.length ? "Cut everything still waiting" : "Nothing waiting",
+      label: "Block confirmed findings",
+      desc: threats.length ? "Block confirmed suspicious items" : "No confirmed findings",
       color: "text-red border-red/20 bg-red-dim hover:bg-red/20",
       icon: ShieldAlert,
       onClick: resolveAllThreats,
-      disabled: pending.length === 0,
+      disabled: threats.length === 0,
     },
     {
       key: "clear",

@@ -184,6 +184,7 @@ export interface SecurityState {
   pause: (id: string) => boolean;
   resume: (id: string) => void;
   resolveAllThreats: () => void;
+  autoFixScan: () => { fixed: number; manual: number };
   clearResolved: () => void;
   refresh: () => void;
   addAllow: (item: Omit<AllowItem, "id">) => void;
@@ -229,7 +230,7 @@ export const useSecurity = create<SecurityState>()(
         alwaysOn: true,
         autoRestart: true,
         tamperProtection: true,
-        autoLockdown: true,
+        autoLockdown: false,
         slackAlerts: false,
         autoScanMin: 30,
         pin: "",
@@ -569,22 +570,63 @@ export const useSecurity = create<SecurityState>()(
         });
       },
       resolveAllThreats: () => {
-        const n = get().activities.filter(
-          (a) => a.status === "suspicious" || a.status === "unknown",
-        ).length;
+        const n = get().activities.filter((a) => a.status === "suspicious").length;
         set({
           activities: get().activities.map((a) =>
-            a.status === "suspicious" || a.status === "unknown"
-              ? { ...a, status: "blocked" as const, resolveNote: "Blocked automatically" }
+            a.status === "suspicious"
+              ? { ...a, status: "blocked" as const, resolveNote: "Confirmed finding blocked by user" }
               : a,
           ),
           history: pushHistory(
             get().history,
-            "Block all threats",
+            "Block confirmed findings",
             `${n} items`,
-            "All suspicious items blocked.",
+            "Confirmed suspicious items blocked; unknown items remain for review.",
           ),
         });
+        syncGuardFrom(get);
+      },
+      autoFixScan: () => {
+        const state = get();
+        const confirmedTraffic = state.activities.filter(
+          (a) => a.type === "traffic" && a.status === "suspicious",
+        );
+        const disarmed = state.honeypots.filter((h) => !h.armed);
+        const needsTamper = !state.settings.tamperProtection;
+
+        for (const item of confirmedTraffic) {
+          get().block(item.id, "Auto Fix: confirmed tracker finding");
+        }
+        if (disarmed.length || needsTamper) {
+          set({
+            honeypots: get().honeypots.map((h) => ({ ...h, armed: true })),
+            settings: needsTamper
+              ? { ...get().settings, tamperProtection: true }
+              : get().settings,
+          });
+        }
+        syncGuardFrom(get);
+
+        const native = readDevicePosture();
+        const remaining = get().activities.filter(
+          (a) => a.status === "unknown" || (a.status === "suspicious" && a.type !== "traffic"),
+        ).length;
+        const deviceManual = native
+          ? Number(native.rootSignals) + Number(native.debuggerAttached) + Number(!native.deviceSecure)
+          : 0;
+        const fixed = confirmedTraffic.length + disarmed.length + Number(needsTamper);
+        const manual = remaining + deviceManual;
+        set({
+          history: pushHistory(
+            get().history,
+            "Auto Fix",
+            `${fixed} safe fix${fixed === 1 ? "" : "es"}`,
+            manual
+              ? `${manual} item${manual === 1 ? "" : "s"} still require manual review.`
+              : "No remaining manual review items detected.",
+          ),
+        });
+        return { fixed, manual };
       },
       clearResolved: () => {
         const keep = get().activities.filter(
@@ -714,14 +756,7 @@ export const useSecurity = create<SecurityState>()(
             `${snap.thirdPartyHosts.length} third-party host${snap.thirdPartyHosts.length === 1 ? "" : "s"}: ${snap.thirdPartyHosts.slice(0, 6).join(", ")}`,
             "learn",
           );
-          if (get().settings.autoLockdown) {
-            for (const host of snap.thirdPartyHosts) {
-              if (get().activities.some((a) => a.name === host && a.status === "suspicious")) {
-                const row = get().activities.find((a) => a.name === host);
-                if (row) get().block(row.id, "Blocked by scan (tracker)");
-              }
-            }
-          }
+          // Analysis is evidence-only. Remediation is chosen from Scan Results.
         } else {
           push("No third-party or tracker hosts in this session", "ok");
         }

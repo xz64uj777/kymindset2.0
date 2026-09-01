@@ -257,3 +257,36 @@ test("emergency lockdown remains an explicitly manual control", () => {
   assert.match(dashboard, /Emergency Lockdown — manual/);
   assert.match(dashboard, /Manual emergency lockdown armed/);
 });
+
+
+test("security scan is evidence-only until the user chooses remediation", () => {
+  const store = read("src/lib/security/store.ts");
+  const start = store.indexOf("runSecurityAnalysis: async");
+  const end = store.indexOf("runDeepScan:", start);
+  assert.ok(start >= 0 && end > start);
+  const scan = store.slice(start, end);
+  assert.doesNotMatch(scan, /settings\.autoLockdown/);
+  assert.doesNotMatch(scan, /Blocked by scan/);
+});
+
+test("post-scan results keep auto-fix and manual decisions together", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.match(overview, /title="Scan Results"/);
+  assert.match(overview, /Auto Fix/);
+  assert.match(overview, /Review all manually/);
+  assert.match(overview, /<ActivityRow key=/);
+  assert.match(overview, /Unknown hosts, Android settings, root\/debugger signals, and emergency lockdown remain manual/);
+});
+
+test("auto-fix only targets confirmed traffic and reversible app controls", () => {
+  const store = read("src/lib/security/store.ts");
+  const start = store.indexOf("autoFixScan: () =>");
+  const end = store.indexOf("clearResolved:", start);
+  assert.ok(start >= 0 && end > start);
+  const fix = store.slice(start, end);
+  assert.match(fix, /a\.type === "traffic" && a\.status === "suspicious"/);
+  assert.match(fix, /tamperProtection: true/);
+  assert.match(fix, /armed: true/);
+  assert.doesNotMatch(fix, /toggleLockdown/);
+  assert.doesNotMatch(fix, /toggleKillSwitch/);
+});
