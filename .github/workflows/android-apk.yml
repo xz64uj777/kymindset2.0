@@ -22,7 +22,7 @@ jobs:
           if [ -d .overlay ]; then
             cat .overlay/part*.b64 | tr -d '\r\n' > /tmp/overlay.b64
             base64 -d /tmp/overlay.b64 > /tmp/overlay.tar.xz
-            echo "5c15120a0c6f3b404b2ea9f8b3f7a2f8b232fae5ea9b9ac74d655df72eb4d6dc  /tmp/overlay.tar.xz" | sha256sum -c -
+            echo "5c15f95685a92beea55524795345b0840262d40937a8d7c6c4131154afa2cd79  /tmp/overlay.tar.xz" | sha256sum -c -
             cp .overlay/kymindset-debug.keystore.b64 /tmp/kymindset-debug.keystore.b64
 
             git clone --depth 1 https://github.com/xz64uj777/kysmindset.git /tmp/base
