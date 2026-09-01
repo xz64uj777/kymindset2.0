@@ -42,6 +42,34 @@ jobs:
           test -f android/app/build.gradle
           test -f android/app/kymindset-debug.keystore
 
+      - name: Apply compiler fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          panels = Path('src/components/security/panels.tsx')
+          text = panels.read_text()
+          text = text.replace(
+              'function MiniStat({ label, value }: { label: string; value: number }) {',
+              'function MiniStat({ label, value }: { label: string; value: number | string }) {'
+          )
+          panels.write_text(text)
+
+          auth = Path('src/lib/auth.ts')
+          text = auth.read_text()
+          if 'function toArrayBuffer(bytes: Uint8Array): ArrayBuffer' not in text:
+              text = text.replace(
+                  'function b64ToBytes(s: string) {\n  const raw = atob(s);\n  return Uint8Array.from(raw, (c) => c.charCodeAt(0));\n}\n\nasync function derive(pin: string, salt: Uint8Array) {',
+                  'function b64ToBytes(s: string) {\n  const raw = atob(s);\n  return Uint8Array.from(raw, (c) => c.charCodeAt(0));\n}\n\nfunction toArrayBuffer(bytes: Uint8Array): ArrayBuffer {\n  const copy = new Uint8Array(bytes.byteLength);\n  copy.set(bytes);\n  return copy.buffer;\n}\n\nasync function derive(pin: string, salt: Uint8Array) {'
+              )
+          text = text.replace(
+              '{ name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS },',
+              '{ name: "PBKDF2", hash: "SHA-256", salt: toArrayBuffer(salt), iterations: ITERATIONS },'
+          )
+          auth.write_text(text)
+          PY
+
       - name: Normalize imported source
         shell: bash
         run: |
@@ -49,7 +77,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "Import hardened Kymindset 2.0 source [skip ci]"
+            git commit -m "Fix hardened source compile errors [skip ci]"
             git push
           fi
 
