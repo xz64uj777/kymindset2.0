@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main, clean-import]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -12,82 +12,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out staging repository
+      - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Import verified hardened source
+      - name: Validate source tree
         shell: bash
         run: |
           set -euo pipefail
-          if [ -d .overlay ]; then
-            cat .overlay/part*.b64 | tr -d '\r\n' > /tmp/overlay.b64
-            base64 -d /tmp/overlay.b64 > /tmp/overlay.tar.xz
-            echo "5c15f95685a92beea55524795345b0840262d40937a8d7c6c4131154afa2cd79  /tmp/overlay.tar.xz" | sha256sum -c -
-            cp .overlay/kymindset-debug.keystore.b64 /tmp/kymindset-debug.keystore.b64
-
-            git clone --depth 1 https://github.com/xz64uj777/kysmindset.git /tmp/base
-            rsync -a --delete \
-              --exclude='.git' \
-              --exclude='.github/workflows/android-apk.yml' \
-              /tmp/base/ ./
-
-            tar -xJf /tmp/overlay.tar.xz -C .
-            mkdir -p android/app
-            base64 -d /tmp/kymindset-debug.keystore.b64 > android/app/kymindset-debug.keystore
-          fi
-
-          rm -rf .overlay .bundle2 .bundle4 .bundle7 .clean_bundle .source_chunks
           test -f package.json
           test -f tests/security-contract.test.mjs
           test -f android/app/build.gradle
           test -f android/app/kymindset-debug.keystore
-
-      - name: Apply compiler fixes
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          panels = Path('src/components/security/panels.tsx')
-          text = panels.read_text()
-          text = text.replace(
-              'function MiniStat({ label, value }: { label: string; value: number }) {',
-              'function MiniStat({ label, value }: { label: string; value: number | string }) {'
-          )
-          panels.write_text(text)
-
-          auth = Path('src/lib/auth.ts')
-          text = auth.read_text()
-          if 'function toArrayBuffer(bytes: Uint8Array): ArrayBuffer' not in text:
-              text = text.replace(
-                  'function b64ToBytes(s: string) {\n  const raw = atob(s);\n  return Uint8Array.from(raw, (c) => c.charCodeAt(0));\n}\n\nasync function derive(pin: string, salt: Uint8Array) {',
-                  'function b64ToBytes(s: string) {\n  const raw = atob(s);\n  return Uint8Array.from(raw, (c) => c.charCodeAt(0));\n}\n\nfunction toArrayBuffer(bytes: Uint8Array): ArrayBuffer {\n  const copy = new Uint8Array(bytes.byteLength);\n  copy.set(bytes);\n  return copy.buffer;\n}\n\nasync function derive(pin: string, salt: Uint8Array) {'
-              )
-          text = text.replace(
-              '{ name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS },',
-              '{ name: "PBKDF2", hash: "SHA-256", salt: toArrayBuffer(salt), iterations: ITERATIONS },'
-          )
-          auth.write_text(text)
-
-          main = Path('android/app/src/main/java/app/kysmindset/security/MainActivity.java')
-          text = main.read_text()
-          text = text.replace(
-              'WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);',
-              'WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0);'
-          )
-          main.write_text(text)
-          PY
-
-      - name: Normalize imported source
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Fix hardened source compile errors [skip ci]"
-            git push
-          fi
+          test -f android/app/src/main/res/drawable/kys_icon.xml
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -131,7 +67,6 @@ jobs:
           if-no-files-found: error
 
       - name: Publish latest APK release
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -141,7 +76,7 @@ jobs:
           BUILD_COMMIT=$(git rev-parse HEAD)
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
-          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\ncommit: %s\nsha256: %s\n\nDevelopment APK for testing.\n' "$VERSION_CODE" "$VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
+          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\ncommit: %s\nsha256: %s\n\nMindset: Observe → Verify → Control → Recover.\n' "$VERSION_CODE" "$VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest --title "Kymindset 2.0 Latest APK" --notes "$NOTES" --latest
