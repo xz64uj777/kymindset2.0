@@ -1,0 +1,58 @@
+plugins {
+    id "com.android.application"
+}
+
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == "org.jetbrains.kotlin") {
+            details.useVersion "1.9.24"
+            details.because "align kotlin-stdlib / jdk7 / jdk8 for biometric"
+        }
+    }
+}
+
+android {
+    namespace "app.kysmindset.security"
+    compileSdk 35
+
+    signingConfigs {
+        sharedDebug {
+            storeFile file("kymindset-debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    defaultConfig {
+        applicationId "app.kysmindset.security"
+        minSdk 26
+        targetSdk 35
+        versionCode System.getenv("KYS_VERSION_CODE") ? System.getenv("KYS_VERSION_CODE").toInteger() : 2
+        versionName System.getenv("KYS_VERSION_NAME") ?: "2.0.0"
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+            minifyEnabled false
+            signingConfig signingConfigs.sharedDebug
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "androidx.webkit:webkit:1.12.1"
+    implementation "androidx.core:core:1.15.0"
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "androidx.biometric:biometric:1.1.0"
+}

@@ -1,0 +1,181 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, existsSync } from "node:fs";
+
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+
+test("Android manifest ships hardened transport and backup defaults", () => {
+  const manifest = read("android/app/src/main/AndroidManifest.xml");
+  assert.match(manifest, /android:allowBackup="false"/);
+  assert.match(manifest, /android:usesCleartextTraffic="false"/);
+  assert.doesNotMatch(manifest, /QUERY_ALL_PACKAGES/);
+  assert.doesNotMatch(manifest, /READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|READ_MEDIA_/);
+  assert.equal(
+    existsSync(new URL("../android/app/src/main/res/xml/network_security_config.xml", import.meta.url)),
+    true,
+  );
+});
+
+test("WebView does not enable universal file URL or filesystem access", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(main, /setAllowFileAccess\(false\)/);
+  assert.match(main, /setAllowContentAccess\(false\)/);
+  assert.match(main, /setMixedContentMode\(WebSettings\.MIXED_CONTENT_NEVER_ALLOW\)/);
+  assert.match(main, /\.invoke\(s, false\)/);
+  assert.doesNotMatch(main, /\.invoke\(s, true\)/);
+});
+
+test("No default plaintext PIN or fake AI confidence remains in product code", () => {
+  const store = read("src/lib/security/store.ts");
+  const overview = read("src/components/security/overview-panel.tsx");
+  const dialogs = read("src/components/security/dialogs.tsx");
+  assert.doesNotMatch(store, /pin:\s*"1234"/);
+  assert.doesNotMatch(overview, /AI Security Engine|Run AI Scan/);
+  assert.doesNotMatch(dialogs, /AI Recommendation|Confidence:\s*\{/);
+});
+
+test("Persisted Zustand settings never retain a plaintext PIN", () => {
+  const store = read("src/lib/security/store.ts");
+  assert.match(store, /settings:\s*\{\s*\.\.\.s\.settings,\s*pin:\s*""\s*\}/s);
+});
+
+test("Native auth bridge uses a salted PBKDF2 verifier and lockout escalation", () => {
+  const auth = read("android/app/src/main/java/app/kysmindset/security/SecurePin.java");
+  assert.match(auth, /PBKDF2WithHmacSHA256/);
+  assert.match(auth, /new SecureRandom\(\)\.nextBytes\(salt\)/);
+  assert.match(auth, /fails >= 10 \? 300_000L : fails >= 7 \? 60_000L : fails >= 5 \? 15_000L/);
+});
+
+test("legacy plaintext PIN store is abandoned and unknown third parties are not scored as confirmed threats", () => {
+  const store = read("src/lib/security/store.ts");
+  assert.match(store, /name:\s*"kysmindset-v5"/);
+  assert.match(store, /localStorage\.removeItem\("kysmindset-v4"\)/);
+  assert.match(store, /filter\(\(a\) => a\.status === "suspicious"\)/);
+});
+
+
+test("native WebView is pinned to app assets before exposing the JavaScript bridge", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(main, /WebViewAssetLoader/);
+  assert.match(main, /appassets\.androidplatform\.net/);
+  assert.match(main, /routeNavigation\(request\.getUrl\(\)\)/);
+  assert.match(main, /addJavascriptInterface\(new KysBridge\(\), "KysAndroid"\)/);
+  assert.doesNotMatch(main, /setWebViewClient\(new WebViewClient\(\)\)/);
+});
+
+test("Android posture bridge reports real native indicators without claiming a malware verdict", () => {
+  const posture = read("android/app/src/main/java/app/kysmindset/security/DevicePosture.java");
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(posture, /Build\.VERSION\.SECURITY_PATCH/);
+  assert.match(posture, /Debug\.isDebuggerConnected\(\)/);
+  assert.match(posture, /isDeviceSecure\(\)/);
+  assert.match(posture, /rootEvidence/);
+  assert.match(main, /public String devicePosture\(\)/);
+});
+
+test("observed hosts and decoy paths are not mislabeled as malicious IP intelligence", () => {
+  const store = read("src/lib/security/store.ts");
+  const types = read("src/lib/security/types.ts");
+  const panels = read("src/components/security/panels.tsx");
+  assert.match(types, /kind: "host" \| "path"/);
+  assert.doesNotMatch(store, /kind: "ip"/);
+  assert.doesNotMatch(panels, /Known Threat IPs|Learned malicious IPs & DNS|AI-powered comprehensive vulnerability assessment/);
+});
+
+test("debug APK has a stable dev identity and release builds are not signed with a public debug key", () => {
+  const gradle = read("android/app/build.gradle");
+  assert.match(gradle, /applicationIdSuffix "\.dev"/);
+  assert.match(gradle, /signingConfig signingConfigs\.sharedDebug/);
+  const release = gradle.match(/release \{([\s\S]*?)\n        \}/)?.[1] ?? "";
+  assert.doesNotMatch(release, /signingConfig signingConfigs\.(debug|sharedDebug)/);
+  assert.equal(existsSync(new URL("../android/app/kymindset-debug.keystore", import.meta.url)), true);
+});
+
+test("self-update requires a published SHA-256 and matching package identity", () => {
+  const updater = read("android/app/src/main/java/app/kysmindset/security/AppUpdate.java");
+  const workflow = read(".github/workflows/android-apk.yml");
+  assert.match(updater, /parseSha256/);
+  assert.match(updater, /APK checksum did not match/);
+  assert.match(updater, /archiveMatchesPackage/);
+  assert.match(workflow, /sha256: %s/);
+});
+
+test("privileged WebView has a restrictive CSP and does not import remote executable UI code", () => {
+  const html = read("index.html");
+  assert.match(html, /Content-Security-Policy/);
+  assert.match(html, /script-src 'self'/);
+  assert.match(html, /object-src 'none'/);
+  assert.match(html, /frame-ancestors 'none'/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+});
+
+test("JavaScript bridge events are serialized as JSON literals instead of hand-built script strings", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(main, /JSONObject\.quote\(name == null \? "" : name\)/);
+  assert.match(main, /JSONObject\.quote\(result == null \? "" : result\)/);
+  assert.doesNotMatch(main, /result\.replace\("\\\\", "\\\\\\\\"\)/);
+});
+
+test("native lock-screen takeover is opt-in", () => {
+  const lock = read("android/app/src/main/java/app/kysmindset/security/LockGateService.java");
+  const app = read("src/App.tsx");
+  const store = read("src/lib/security/store.ts");
+  assert.match(lock, /getBoolean\(KEY_DEVICE_LOCK, false\)/);
+  assert.match(app, /settings\.deviceLock === true/);
+  assert.match(store, /deviceLock:\s*false/);
+});
+
+test("manifest follows least privilege for boot receiver and package visibility", () => {
+  const manifest = read("android/app/src/main/AndroidManifest.xml");
+  assert.match(manifest, /android:name="\.BootReceiver"[\s\S]*?android:exported="false"/);
+  assert.doesNotMatch(manifest, /USE_FULL_SCREEN_INTENT|DISABLE_KEYGUARD/);
+  assert.doesNotMatch(manifest, /com\.facebook\.|com\.instagram\.|com\.whatsapp|com\.snapchat|com\.spotify/);
+});
+
+test("unknown activity remains review evidence rather than a confirmed threat badge", () => {
+  const dashboard = read("src/components/security/dashboard.tsx");
+  const store = read("src/lib/security/store.ts");
+  assert.match(dashboard, /confirmedFindings = activities\.filter\(\(a\) => a\.status === "suspicious"\)/);
+  assert.match(store, /confirmedFindingCount = activities\.filter/);
+  assert.match(store, /a\.status === "suspicious"/);
+  assert.doesNotMatch(store, /const threatN = activities\.filter\([\s\S]*?"unknown"/);
+});
+
+test("posture score cannot be inflated by emergency kill or lockdown modes", () => {
+  const store = read("src/lib/security/store.ts");
+  assert.doesNotMatch(store, /if \(killSwitch\) score = Math\.min/);
+  assert.doesNotMatch(store, /if \(lockdown\) score = Math\.min/);
+});
+
+test("runtime control labels describe implemented behavior instead of nonexistent auto-restart", () => {
+  const config = read("src/components/security/config-panel.tsx");
+  assert.match(config, /title="Keep Awake"/);
+  assert.match(config, /Android can still suspend or stop the app/);
+  assert.doesNotMatch(config, /title="Auto Restart"/);
+  assert.doesNotMatch(config, /title="Slack Alerts"/);
+  assert.match(config, /App Transport/);
+  assert.match(config, /not Wi-Fi encryption/);
+});
+
+test("Android posture includes developer, ADB, notification, and battery reliability signals", () => {
+  const posture = read("android/app/src/main/java/app/kysmindset/security/DevicePosture.java");
+  const native = read("src/lib/native.ts");
+  for (const key of ["developerOptionsEnabled", "adbEnabled", "notificationsEnabled", "batteryOptimized"]) {
+    assert.match(posture, new RegExp(`o\\.put\\("${key}"`));
+    assert.match(native, new RegExp(`${key}: boolean`));
+  }
+});
+
+test("VPN allowlist input is bounded and package-name validated", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(main, /accepted < 200/);
+  assert.match(main, /pkg\.matches\("\[A-Za-z0-9_\]\+/);
+  assert.match(main, /pkg\.length\(\) > 220/);
+});
+
+test("product UI carries the evidence-first mindset", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.match(overview, /title="Mindset"/);
+  assert.match(overview, /Observe → verify → control → recover/i);
+  assert.match(overview, /Unknown means review — never automatically malware/);
+});
