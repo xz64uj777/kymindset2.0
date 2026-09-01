@@ -78,7 +78,7 @@ public class MainActivity extends FragmentActivity {
         }
         CookieManager.getInstance().setAcceptCookie(false);
         if (Build.VERSION.SDK_INT >= 21) CookieManager.getInstance().setAcceptThirdPartyCookies(web, false);
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0);
 
         WebViewAssetLoader assetLoader =
             new WebViewAssetLoader.Builder()
