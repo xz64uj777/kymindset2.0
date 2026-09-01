@@ -19,6 +19,8 @@ export function OverviewPanel() {
   const allowlist = useSecurity((s) => s.allowlist);
   const scanLog = useSecurity((s) => s.scanLog);
   const killSwitch = useSecurity((s) => s.killSwitch);
+  const toggleKillSwitch = useSecurity((s) => s.toggleKillSwitch);
+  const setTab = useSecurity((s) => s.setTab);
   const score = useScore();
   const tone = ScoreTone(score.status);
   const [deviceVpn, setDeviceVpn] = useState<boolean | null>(() => isDeviceVpnActive());
@@ -99,6 +101,16 @@ export function OverviewPanel() {
             <div className="mt-1 text-sm font-semibold text-fg">{allowlist.length} trusted entries</div>
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={toggleKillSwitch}>
+            {killSwitch ? "Stop Protection" : "Start Protection"}
+          </Button>
+          <span className="text-2xs text-subtle">
+            {killSwitch
+              ? "App Network Guard is armed. Android VPN status above confirms the device tunnel."
+              : "Starts the app network guard and requests Android VPN protection. Android may show a VPN permission prompt."}
+          </span>
+        </div>
         <p className="mt-2 text-2xs text-subtle">
           Device VPN status comes from the Android bridge. Browser/runtime telemetry below is app-only unless explicitly labeled Android or VPN.
         </p>
@@ -107,15 +119,46 @@ export function OverviewPanel() {
         <PanelHeader icon={<Radar className="size-4" />} title="Mindset" subtitle="Observe → verify → control → recover" />
         <div className="grid gap-2 sm:grid-cols-4">
           {[
-            ["Observe", "Collect only what this app or Android can actually see."],
-            ["Verify", "Unknown means review — never automatically malware."],
-            ["Control", "Allow, block, lockdown, or cut traffic deliberately."],
-            ["Recover", "Keep lock, update, and protection state easy to restore."],
-          ].map(([title, detail]) => (
-            <div key={title} className="rounded-md border border-line bg-elevated p-3">
+            {
+              title: "Observe",
+              detail: "Collect only what this app or Android can actually see.",
+              action: scanning ? "Analyzing…" : "Run analysis",
+              disabled: scanning,
+              onClick: () => void runSecurityAnalysis(),
+            },
+            {
+              title: "Verify",
+              detail: "Unknown means review — never automatically malware.",
+              action: "Review network",
+              disabled: false,
+              onClick: () => setTab("network"),
+            },
+            {
+              title: "Control",
+              detail: "Allow, block, lockdown, or cut traffic deliberately.",
+              action: killSwitch ? "Open controls" : "Start protection",
+              disabled: false,
+              onClick: () => (killSwitch ? setTab("network") : toggleKillSwitch()),
+            },
+            {
+              title: "Recover",
+              detail: "Keep lock, update, and protection state easy to restore.",
+              action: "Open recovery",
+              disabled: false,
+              onClick: () => setTab("config"),
+            },
+          ].map(({ title, detail, action, disabled, onClick }) => (
+            <button
+              key={title}
+              type="button"
+              disabled={disabled}
+              onClick={onClick}
+              className="rounded-md border border-line bg-elevated p-3 text-left transition-colors hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
+            >
               <div className="text-xs font-semibold text-fg">{title}</div>
               <div className="mt-1 text-2xs leading-relaxed text-subtle">{detail}</div>
-            </div>
+              <div className="mt-2 text-2xs font-medium text-cyan">{action} →</div>
+            </button>
           ))}
         </div>
       </Panel>

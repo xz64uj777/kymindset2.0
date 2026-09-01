@@ -179,3 +179,13 @@ test("product UI carries the evidence-first mindset", () => {
   assert.match(overview, /Observe → verify → control → recover/i);
   assert.match(overview, /Unknown means review — never automatically malware/);
 });
+
+
+test("overview exposes working protection and mindset actions", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.match(overview, /Start Protection/);
+  assert.match(overview, /toggleKillSwitch/);
+  assert.match(overview, /Run analysis/);
+  assert.match(overview, /Review network/);
+  assert.match(overview, /Open recovery/);
+});
