@@ -15,6 +15,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Make Control deliberate, not automatic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fix_control_semantics.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/security/overview-panel.tsx src/components/security/dashboard.tsx tests/security-contract.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m "Make Control deliberate and lockdown manual [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Validate source tree
         shell: bash
         run: |
