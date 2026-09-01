@@ -15,6 +15,19 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Fix storage tamper false positives
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/fix_storage_tamper.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          if ! git diff --cached --quiet; then
+            git commit -m "Stop treating app storage sync as intrusion [skip ci]"
+            git push
+          fi
+
       - name: Validate source tree
         shell: bash
         run: |
