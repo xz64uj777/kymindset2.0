@@ -23,6 +23,12 @@ function b64ToBytes(s: string) {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 async function derive(pin: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey(
     "raw",
@@ -32,7 +38,7 @@ async function derive(pin: string, salt: Uint8Array) {
     ["deriveBits"],
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS },
+    { name: "PBKDF2", hash: "SHA-256", salt: toArrayBuffer(salt), iterations: ITERATIONS },
     material,
     256,
   );

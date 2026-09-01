@@ -259,7 +259,7 @@ function Row({ k, v, tone }: { k: string; v: string; tone: string }) {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: number }) {
+function MiniStat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-md border border-line bg-elevated p-2.5">
       <div className="text-lg font-bold text-fg tabular-nums">{value}</div>
