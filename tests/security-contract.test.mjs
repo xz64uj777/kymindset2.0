@@ -237,3 +237,23 @@ test("network traffic rows expose allow block details and end controls", () => {
   assert.match(engine, /export function unblockHost/);
   assert.match(store, /unblockHost\(a\.destination\)/);
 });
+
+
+test("mindset Control opens controls without arming containment", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  const start = overview.indexOf('title: "Control"');
+  const end = overview.indexOf('title: "Recover"', start);
+  assert.ok(start >= 0 && end > start);
+  const control = overview.slice(start, end);
+  assert.match(control, /action: "Open controls"/);
+  assert.match(control, /setTab\("network"\)/);
+  assert.doesNotMatch(control, /toggleKillSwitch/);
+  assert.doesNotMatch(control, /toggleLockdown/);
+  assert.doesNotMatch(control, /Start protection/);
+});
+
+test("emergency lockdown remains an explicitly manual control", () => {
+  const dashboard = read("src/components/security/dashboard.tsx");
+  assert.match(dashboard, /Emergency Lockdown — manual/);
+  assert.match(dashboard, /Manual emergency lockdown armed/);
+});

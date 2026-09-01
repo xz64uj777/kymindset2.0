@@ -147,17 +147,12 @@ export function OverviewPanel() {
             },
             {
               title: "Control",
-              detail: "Allow, block, lockdown, or cut traffic deliberately.",
-              action: killSwitch ? "Open controls" : "Start protection",
+              detail: "Choose allow, block, protection, or emergency containment deliberately.",
+              action: "Open controls",
               disabled: false,
               onClick: () => {
-                if (!killSwitch) {
-                  toggleKillSwitch();
-                  toast.message("Starting protection — approve Android VPN if prompted.");
-                } else {
-                  scrollToPanel("Protection state");
-                  toast.message("Protection is active. Use Stop Protection or Network for detailed controls.");
-                }
+                setTab("network");
+                toast.message("Controls opened — review the evidence, then choose Allow, Block, End, or emergency protection.");
               },
             },
             {

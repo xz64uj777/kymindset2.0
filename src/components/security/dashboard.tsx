@@ -159,12 +159,12 @@ export function Dashboard() {
             </button>
             <button
               type="button"
-              title="Emergency Lockdown"
+              title="Emergency Lockdown — manual"
               aria-pressed={lockdown}
               onClick={() => {
                 const arming = !lockdown;
                 toggleLockdown();
-                if (arming) toast.error("App lockdown armed — unclassified third-party Kysmindset requests are blocked.");
+                if (arming) toast.error("Manual emergency lockdown armed — unclassified third-party Kysmindset requests are blocked.");
                 else toast.success("App lockdown lifted.");
               }}
               className={cn(
