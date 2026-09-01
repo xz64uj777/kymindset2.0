@@ -34,7 +34,6 @@ jobs:
             tar -xJf /tmp/overlay.tar.xz -C .
             mkdir -p android/app
             base64 -d /tmp/kymindset-debug.keystore.b64 > android/app/kymindset-debug.keystore
-            touch /tmp/imported
           fi
 
           rm -rf .overlay .bundle2 .bundle4 .bundle7 .clean_bundle .source_chunks
@@ -42,6 +41,17 @@ jobs:
           test -f tests/security-contract.test.mjs
           test -f android/app/build.gradle
           test -f android/app/kymindset-debug.keystore
+
+      - name: Normalize imported source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Import hardened Kymindset 2.0 source [skip ci]"
+            git push
+          fi
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -76,17 +86,6 @@ jobs:
 
       - name: Build debug APK
         run: gradle -p android :app:assembleDebug --stacktrace --no-daemon
-
-      - name: Normalize repository source
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Import hardened Kymindset 2.0 source [skip ci]"
-            git push || echo "Build succeeded; normalized source could not be pushed."
-          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
