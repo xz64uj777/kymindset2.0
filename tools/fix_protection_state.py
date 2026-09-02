@@ -6,9 +6,10 @@ TESTS = Path("tests/security-contract.test.mjs")
 store = STORE.read_text()
 old_tab = '          tab: next ? "network" : get().tab,\n'
 new_tab = '          tab: get().tab,\n'
-if old_tab not in store:
-    raise SystemExit("protection tab-switch pattern not found")
-store = store.replace(old_tab, new_tab, 1)
+if old_tab in store:
+    store = store.replace(old_tab, new_tab, 1)
+elif new_tab not in store:
+    raise SystemExit("protection tab state pattern not found")
 
 old_denied = '''          if (status === "denied") {
             set({
@@ -34,9 +35,10 @@ new_denied = '''          if (status === "denied") {
             // Keep killSwitch true: it represents the app request guard too. The UI reports Android VPN separately.
             syncGuardFrom(get);
 '''
-if old_denied not in store:
-    raise SystemExit("VPN denied pattern not found")
-store = store.replace(old_denied, new_denied, 1)
+if old_denied in store:
+    store = store.replace(old_denied, new_denied, 1)
+elif new_denied not in store:
+    raise SystemExit("VPN denied state pattern not found")
 STORE.write_text(store)
 
 tests = TESTS.read_text()
@@ -46,7 +48,7 @@ if marker not in tests:
 
 test("protection remains internally consistent when Android VPN is unavailable", () => {
   const store = read("src/lib/security/store.ts");
-  const start = store.indexOf("toggleKillSwitch: () =>");
+  const start = store.indexOf("toggleKillSwitch: () => {");
   const end = store.indexOf("toggleLockdown:", start);
   assert.ok(start >= 0 && end > start);
   const toggle = store.slice(start, end);
@@ -58,4 +60,10 @@ test("protection remains internally consistent when Android VPN is unavailable",
   assert.match(deniedBlock, /app network guard remains active/);
 });
 '''
-    TESTS.write_text(tests)
+else:
+    tests = tests.replace(
+        'const start = store.indexOf("toggleKillSwitch: () =>");',
+        'const start = store.indexOf("toggleKillSwitch: () => {");',
+        1,
+    )
+TESTS.write_text(tests)
