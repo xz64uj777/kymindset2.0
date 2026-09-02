@@ -110,7 +110,7 @@ function beginNativePrompt(ms = 120_000) {
 function endNativePromptSoon() {
   window.setTimeout(() => {
     nativePromptUntil = 0;
-  }, 1500);
+  }, 5000);
 }
 
 export function isNativePromptActive() {

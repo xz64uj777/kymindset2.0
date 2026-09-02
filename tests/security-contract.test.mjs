@@ -307,3 +307,16 @@ test("protection remains internally consistent when Android VPN is unavailable",
   assert.doesNotMatch(deniedBlock, /killSwitch:\s*false/);
   assert.match(deniedBlock, /app network guard remains active/);
 });
+
+
+test("app-initiated Android system UI cannot trip the lock gate", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  const native = read("src/lib/native.ts");
+  assert.match(main, /expectedSystemUiPending/);
+  assert.match(main, /shouldSuppressPauseGate\(\)/);
+  assert.match(main, /if \(shouldSuppressPauseGate\(\)\) return;/);
+  assert.match(main, /beginExpectedSystemUi\(\);[\s\S]*startActivityForResult\(prep, VPN_REQ\)/);
+  assert.match(main, /if \(requestCode != VPN_REQ\) return;[\s\S]*endExpectedSystemUi\(\);/);
+  assert.doesNotMatch(main, /suppressNextPauseGate/);
+  assert.match(native, /}, 5000\);/);
+});

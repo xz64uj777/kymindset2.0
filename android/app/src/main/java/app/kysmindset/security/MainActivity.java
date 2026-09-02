@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
@@ -39,7 +40,8 @@ public class MainActivity extends FragmentActivity {
     private static final int ADMIN_REQ = 92;
     private WebView web;
     private boolean gated = true;
-    private boolean suppressNextPauseGate = false;
+    private boolean expectedSystemUiPending = false;
+    private long pauseGateGraceUntilMs = 0L;
 
     public static void requestLock(Context ctx) {
         Intent i = new Intent(ctx, MainActivity.class);
@@ -215,13 +217,23 @@ public class MainActivity extends FragmentActivity {
         handleLockIntent(intent);
     }
 
+    private void beginExpectedSystemUi() {
+        expectedSystemUiPending = true;
+    }
+
+    private void endExpectedSystemUi() {
+        expectedSystemUiPending = false;
+        pauseGateGraceUntilMs = SystemClock.elapsedRealtime() + 5000L;
+    }
+
+    private boolean shouldSuppressPauseGate() {
+        return expectedSystemUiPending || SystemClock.elapsedRealtime() < pauseGateGraceUntilMs;
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
-        if (suppressNextPauseGate) {
-            suppressNextPauseGate = false;
-            return;
-        }
+        if (shouldSuppressPauseGate()) return;
         if (LockGateService.deviceLockOn(this) && !gated) {
             gated = true;
             sendEvent("kys-gate", "lock");
@@ -277,6 +289,7 @@ public class MainActivity extends FragmentActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ADMIN_REQ) {
+            endExpectedSystemUi();
             if (DeviceOwner.isAdmin(this)) {
                 DeviceOwner.applyLockPolicies(this);
                 startLockGate();
@@ -284,6 +297,7 @@ public class MainActivity extends FragmentActivity {
             return;
         }
         if (requestCode != VPN_REQ) return;
+        endExpectedSystemUi();
         if (resultCode == RESULT_OK) startVpn();
         else sendKill("denied");
     }
@@ -366,7 +380,7 @@ public class MainActivity extends FragmentActivity {
                     }
                     Intent prep = VpnService.prepare(MainActivity.this);
                     if (prep != null) {
-                        suppressNextPauseGate = true;
+                        beginExpectedSystemUi();
                         startActivityForResult(prep, VPN_REQ);
                     } else {
                         startVpn();
@@ -399,7 +413,7 @@ public class MainActivity extends FragmentActivity {
         public void requestAdmin() {
             runOnUiThread(
                 () -> {
-                    suppressNextPauseGate = true;
+                    beginExpectedSystemUi();
                     startActivityForResult(DeviceOwner.adminAddIntent(MainActivity.this), ADMIN_REQ);
                 });
         }
@@ -493,12 +507,14 @@ public class MainActivity extends FragmentActivity {
                                 @Override
                                 public void onAuthenticationSucceeded(
                                     @NonNull BiometricPrompt.AuthenticationResult result) {
+                                    endExpectedSystemUi();
                                     sendBio("ok");
                                 }
 
                                 @Override
                                 public void onAuthenticationError(
                                     int errorCode, @NonNull CharSequence errString) {
+                                    endExpectedSystemUi();
                                     if (errorCode == BiometricPrompt.ERROR_NO_BIOMETRICS
                                         || errorCode == BiometricPrompt.ERROR_HW_NOT_PRESENT
                                         || errorCode == BiometricPrompt.ERROR_HW_UNAVAILABLE) {
@@ -515,6 +531,7 @@ public class MainActivity extends FragmentActivity {
                             .setNegativeButtonText("Cancel")
                             .setAllowedAuthenticators(authenticators)
                             .build();
+                    beginExpectedSystemUi();
                     prompt.authenticate(info);
                 });
         }
