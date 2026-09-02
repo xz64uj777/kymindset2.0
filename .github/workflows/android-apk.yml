@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      KYS_VERSION_CODE: ${{ github.run_number }}
+      KYS_VERSION_NAME: 2.0.${{ github.run_number }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -71,18 +74,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          VERSION_CODE=$(sed -n 's/.*versionCode[[:space:]]\+\([0-9][0-9]*\).*/\1/p' android/app/build.gradle | head -1)
-          VERSION_NAME=$(sed -n 's/.*versionName[[:space:]]\+"\([^"]*\)".*/\1/p' android/app/build.gradle | head -1)
+          set -euo pipefail
           BUILD_COMMIT=$(git rev-parse HEAD)
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
-          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\ncommit: %s\nsha256: %s\n\nFlow: Scan → Results → Auto Fix or Manual Review.\n' "$VERSION_CODE" "$VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
+          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\ncommit: %s\nsha256: %s\n\nFlow: Scan → Results → Auto Fix or Manual Review.\n' "$KYS_VERSION_CODE" "$KYS_VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest --title "Kymindset 2.0 Latest APK" --notes "$NOTES" --latest
-            gh release upload apk-latest "$APK" --clobber
+            gh release delete-asset apk-latest app-debug.apk -y >/dev/null 2>&1 || true
+            gh release upload apk-latest "$APK#app-debug.apk"
           else
-            gh release create apk-latest "$APK" \
+            gh release create apk-latest "$APK#app-debug.apk" \
               --title "Kymindset 2.0 Latest APK" \
               --notes "$NOTES" \
               --latest
