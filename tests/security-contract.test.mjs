@@ -296,7 +296,7 @@ test("auto-fix only targets confirmed traffic and reversible app controls", () =
 
 test("protection remains internally consistent when Android VPN is unavailable", () => {
   const store = read("src/lib/security/store.ts");
-  const start = store.indexOf("toggleKillSwitch: () =>");
+  const start = store.indexOf("toggleKillSwitch: () => {");
   const end = store.indexOf("toggleLockdown:", start);
   assert.ok(start >= 0 && end > start);
   const toggle = store.slice(start, end);
