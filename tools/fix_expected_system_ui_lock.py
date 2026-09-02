@@ -6,11 +6,12 @@ TESTS = Path("tests/security-contract.test.mjs")
 
 main = MAIN.read_text()
 
-main = main.replace(
-    "import android.os.Bundle;\n",
-    "import android.os.Bundle;\nimport android.os.SystemClock;\n",
-    1,
-)
+if "import android.os.SystemClock;" not in main:
+    main = main.replace(
+        "import android.os.Bundle;\n",
+        "import android.os.Bundle;\nimport android.os.SystemClock;\n",
+        1,
+    )
 main = main.replace(
     "    private boolean suppressNextPauseGate = false;\n",
     "    private boolean expectedSystemUiPending = false;\n    private long pauseGateGraceUntilMs = 0L;\n",
@@ -123,7 +124,6 @@ if old_admin in main:
 elif new_admin not in main:
     raise SystemExit("admin permission launch pattern not found")
 
-# Biometric is also app-initiated system UI; keep the same lifecycle contract.
 old_bio_start = '''                    prompt.authenticate(info);
 '''
 new_bio_start = '''                    beginExpectedSystemUi();
@@ -161,10 +161,27 @@ if new_bio_error not in main:
 MAIN.write_text(main)
 
 native = NATIVE.read_text()
-native = native.replace("  }, 1500);", "  }, 5000);", 1)
+if "  }, 5000);" not in native:
+    native = native.replace("  }, 1500);", "  }, 5000);", 1)
 NATIVE.write_text(native)
 
 tests = TESTS.read_text()
+old_test = r'''test("native VPN permission activity does not trip device-lock pause gate", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(main, /suppressNextPauseGate/);
+  assert.match(main, /if \(suppressNextPauseGate\)/);
+  assert.match(main, /suppressNextPauseGate = true;[\s\S]*startActivityForResult\(prep, VPN_REQ\)/);
+});'''
+new_test = r'''test("native VPN permission activity does not trip device-lock pause gate", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  assert.match(main, /expectedSystemUiPending/);
+  assert.match(main, /if \(shouldSuppressPauseGate\(\)\) return;/);
+  assert.match(main, /beginExpectedSystemUi\(\);[\s\S]*startActivityForResult\(prep, VPN_REQ\)/);
+  assert.match(main, /if \(requestCode != VPN_REQ\) return;[\s\S]*endExpectedSystemUi\(\);/);
+});'''
+if old_test in tests:
+    tests = tests.replace(old_test, new_test, 1)
+
 marker = 'test("app-initiated Android system UI cannot trip the lock gate"'
 if marker not in tests:
     tests += r'''
