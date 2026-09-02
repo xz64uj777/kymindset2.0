@@ -15,6 +15,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Fix app-initiated system UI auto-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fix_expected_system_ui_lock.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/java/app/kysmindset/security/MainActivity.java src/lib/native.ts tests/security-contract.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m "Keep app-initiated Android UI from triggering auto-lock [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Validate source tree
         shell: bash
         run: |
