@@ -349,7 +349,7 @@ export const useSecurity = create<SecurityState>()(
         set({
           killSwitch: next,
           activities,
-          tab: next ? "network" : get().tab,
+          tab: get().tab,
           linkKbps: next ? 0 : linkKbpsNow(false),
           history: pushHistory(
             get().history,
@@ -365,14 +365,14 @@ export const useSecurity = create<SecurityState>()(
         void setDeviceKill(next).then((status) => {
           if (status === "denied") {
             set({
-              killSwitch: false,
               history: pushHistory(
                 get().history,
-                "VPN permission denied",
+                "Device VPN unavailable",
                 "Network",
-                "Android VPN permission was denied. Kysmindset's own network guard remains the only enforced layer.",
+                "Android VPN permission was denied or unavailable. Kysmindset's app network guard remains active until you stop protection.",
               ),
             });
+            // Keep killSwitch true: it represents the app request guard too. The UI reports Android VPN separately.
             syncGuardFrom(get);
           } else if (status === "on") {
             set({

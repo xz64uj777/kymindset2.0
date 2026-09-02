@@ -292,3 +292,18 @@ test("auto-fix only targets confirmed traffic and reversible app controls", () =
   assert.doesNotMatch(fix, /toggleLockdown/);
   assert.doesNotMatch(fix, /toggleKillSwitch/);
 });
+
+
+test("protection remains internally consistent when Android VPN is unavailable", () => {
+  const store = read("src/lib/security/store.ts");
+  const start = store.indexOf("toggleKillSwitch: () =>");
+  const end = store.indexOf("toggleLockdown:", start);
+  assert.ok(start >= 0 && end > start);
+  const toggle = store.slice(start, end);
+  assert.doesNotMatch(toggle, /tab: next \? "network"/);
+  const denied = toggle.indexOf('status === "denied"');
+  assert.ok(denied >= 0);
+  const deniedBlock = toggle.slice(denied, toggle.indexOf('status === "on"', denied));
+  assert.doesNotMatch(deniedBlock, /killSwitch:\s*false/);
+  assert.match(deniedBlock, /app network guard remains active/);
+});
