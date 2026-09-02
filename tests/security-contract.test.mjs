@@ -224,9 +224,10 @@ test("Android permission sheets do not trigger standalone auto-lock", () => {
 
 test("native VPN permission activity does not trip device-lock pause gate", () => {
   const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
-  assert.match(main, /suppressNextPauseGate/);
-  assert.match(main, /if \(suppressNextPauseGate\)/);
-  assert.match(main, /suppressNextPauseGate = true;[\s\S]*startActivityForResult\(prep, VPN_REQ\)/);
+  assert.match(main, /expectedSystemUiPending/);
+  assert.match(main, /if \(shouldSuppressPauseGate\(\)\) return;/);
+  assert.match(main, /beginExpectedSystemUi\(\);[\s\S]*startActivityForResult\(prep, VPN_REQ\)/);
+  assert.match(main, /if \(requestCode != VPN_REQ\) return;[\s\S]*endExpectedSystemUi\(\);/);
 });
 
 test("network traffic rows expose allow block details and end controls", () => {
