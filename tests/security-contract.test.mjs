@@ -382,3 +382,29 @@ test("scan separates alerts review and weakened protection", () => {
   assert.match(overview, /Interrupted — recovery pending/);
   assert.doesNotMatch(overview, /Needs review \/ weakened/);
 });
+
+
+test("protection recovery reconciles native desired state", () => {
+  const manifest = read("android/app/src/main/AndroidManifest.xml");
+  const store = read("src/lib/security/store.ts");
+  const vpn = read("android/app/src/main/java/app/kysmindset/security/KillVpnService.java");
+  const boot = read("android/app/src/main/java/app/kysmindset/security/BootReceiver.java");
+  assert.match(manifest, /android\.intent\.action\.MY_PACKAGE_REPLACED/);
+  assert.match(vpn, /KEY_DESIRED/);
+  assert.match(vpn, /restoreIfDesired/);
+  assert.match(boot, /KillVpnService\.restoreIfDesired\(context\)/);
+  assert.match(store, /restoredKillSwitch = get\(\)\.killSwitch \|\| Boolean\(native\?\.vpnDesired\)/);
+  assert.match(store, /devicePosture: native/);
+});
+
+test("scan results separate alerts review and weakened posture", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  const store = read("src/lib/security/store.ts");
+  assert.match(overview, /Alerts · confirmed suspicious/);
+  assert.match(overview, /Needs review · unknown \/ unclassified/);
+  assert.match(overview, />Weakened</);
+  assert.doesNotMatch(overview, /Alerts & review items/);
+  assert.match(store, /confirmedOpen/);
+  assert.match(store, /unknownOpen/);
+  assert.doesNotMatch(store, /vulns\.push\(\{ name: .*third-party/i);
+});

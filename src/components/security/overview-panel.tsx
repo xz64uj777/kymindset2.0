@@ -214,23 +214,35 @@ export function OverviewPanel() {
 
           {deepScanning ? <p className="mt-3 text-xs text-muted">Building the final posture summary…</p> : null}
 
-          {openItems.length ? (
+          {threats.length ? (
             <div className="mt-4 space-y-2">
-              <div className="text-xs font-semibold text-fg">Alerts & review items</div>
-              {openItems.slice(0, 4).map((item) => (
+              <div className="text-xs font-semibold text-rose">Alerts · confirmed suspicious</div>
+              {threats.slice(0, 3).map((item) => (
                 <ActivityRow key={item.id} item={item} />
               ))}
-              {openItems.length > 4 ? (
-                <button type="button" onClick={() => setTab("network")} className="text-xs font-medium text-cyan hover:underline">
-                  Review all {openItems.length} manually →
-                </button>
-              ) : null}
             </div>
-          ) : (
+          ) : null}
+
+          {reviewItems.length ? (
+            <div className="mt-4 space-y-2">
+              <div className="text-xs font-semibold text-amber">Needs review · unknown / unclassified</div>
+              {reviewItems.slice(0, 3).map((item) => (
+                <ActivityRow key={item.id} item={item} />
+              ))}
+            </div>
+          ) : null}
+
+          {openItems.length > 6 ? (
+            <button type="button" onClick={() => setTab("network")} className="mt-3 text-xs font-medium text-fg hover:underline">
+              Open Network to review all {openItems.length} items →
+            </button>
+          ) : null}
+
+          {!openItems.length ? (
             <p className="mt-4 rounded-md border border-emerald/20 bg-emerald-dim/30 px-3 py-2 text-xs text-emerald">
               No open network findings need a decision.
             </p>
-          )}
+          ) : null}
 
           {deepScan?.vulnerabilities.length ? (
             <div className="mt-4">

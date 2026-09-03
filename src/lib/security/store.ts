@@ -274,12 +274,16 @@ export const useSecurity = create<SecurityState>()(
             previousLastTamper && falseStorageRewrite(previousLastTamper)
               ? tamperLog[0] ?? null
               : previousLastTamper;
+          const native = readDevicePosture();
+          const restoredKillSwitch = get().killSwitch || Boolean(native?.vpnDesired);
           set({
             hydrated: true,
             unlocked,
             connection: readConnection(),
             tamperLog,
             lastTamper,
+            killSwitch: restoredKillSwitch,
+            devicePosture: native,
           });
           void bootEngine().then(async () => {
             syncGuardFrom(get);
@@ -804,8 +808,12 @@ export const useSecurity = create<SecurityState>()(
             vulns.push({ name: `${disarmed.length} disarmed decoys`, severity: "medium" });
           if (!get().settings.tamperProtection)
             vulns.push({ name: "Tamper Protection is off", severity: "high" });
-          if (openFindings.length)
-            recs.push({ action: "Review, block, or allow remaining open hosts", priority: "high" });
+          const confirmedOpen = openFindings.filter((a) => a.status === "suspicious").length;
+          const unknownOpen = openFindings.filter((a) => a.status === "unknown").length;
+          if (confirmedOpen)
+            recs.push({ action: `Block or inspect ${confirmedOpen} confirmed alert${confirmedOpen === 1 ? "" : "s"}`, priority: "high" });
+          if (unknownOpen)
+            recs.push({ action: `Review ${unknownOpen} unknown or unclassified connection${unknownOpen === 1 ? "" : "s"}`, priority: "medium" });
           if (!snap.nativeApp && !snap.sw)
             recs.push({ action: "Install the PWA so the worker can intercept web requests", priority: "high" });
           if (!snap.persisted)
@@ -879,6 +887,8 @@ export const useSecurity = create<SecurityState>()(
       },
       liveTick: () => {
         const st = get();
+        const nativePosture = readDevicePosture();
+        if (nativePosture) set({ devicePosture: nativePosture });
         const pausedMonitor = st.activities.some(
           (a) => a.id === "proc-kysmindset" && a.status === "paused",
         );
