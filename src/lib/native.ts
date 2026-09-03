@@ -140,6 +140,7 @@ export type DevicePosture = {
   emulatorEvidence: string[];
   vpnActive: boolean;
   vpnDesired: boolean;
+  vpnDesired: boolean;
   deviceAdmin: boolean;
   deviceOwner: boolean;
   lockTaskPermitted: boolean;
