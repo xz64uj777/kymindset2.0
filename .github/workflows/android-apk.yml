@@ -22,6 +22,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Apply live scan visibility checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/apply_live_scan_visuals.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/security/overview-panel.tsx tests/security-contract.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m "Integrate live scan feed into scan flow [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Validate source tree
         shell: bash
         run: |
@@ -82,7 +97,7 @@ jobs:
           BUILD_COMMIT=$(git rev-parse HEAD)
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
-          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\ncommit: %s\nsha256: %s\n\nCheckpoint: native protection recovery + distinct Alert / Review / Weakened scan results.\nUpdater: verified download → Android confirmation prompt → install result.\n' "$KYS_VERSION_CODE" "$KYS_VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
+          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\ncommit: %s\nsha256: %s\n\nCheckpoint: live scan feed integrated into Security Scan + calmer scan visuals.\nUpdater: verified download → Android confirmation prompt → install result.\n' "$KYS_VERSION_CODE" "$KYS_VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest --title "Kymindset 2.0 Latest APK" --notes "$NOTES" --latest
