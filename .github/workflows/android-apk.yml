@@ -82,7 +82,7 @@ jobs:
           BUILD_COMMIT=$(git rev-parse HEAD)
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
-          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\ncommit: %s\nsha256: %s\n\nFlow: Scan → Results → Auto Fix or Manual Review.\n' "$KYS_VERSION_CODE" "$KYS_VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
+          NOTES=$(printf 'Kymindset 2.0 hardened test build.\n\nversionCode: %s\nversionName: %s\npackage: app.kysmindset.security.dev\ncommit: %s\nsha256: %s\n\nFlow: Scan → Results → Auto Fix or Manual Review.\nUpdater: verified download → Android confirmation prompt → install result.\n' "$KYS_VERSION_CODE" "$KYS_VERSION_NAME" "$BUILD_COMMIT" "$APK_SHA")
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest --title "Kymindset 2.0 Latest APK" --notes "$NOTES" --latest
