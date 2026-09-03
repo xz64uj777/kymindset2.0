@@ -345,3 +345,36 @@ test("self-update surfaces Android installer confirmation", () => {
   assert.match(update, /USER_ACTION_REQUIRED/);
   assert.doesNotMatch(update, /USER_ACTION_NOT_REQUIRED/);
 });
+
+
+test("native VPN desired state survives service lifecycle", () => {
+  const vpn = read("android/app/src/main/java/app/kysmindset/security/KillVpnService.java");
+  const boot = read("android/app/src/main/java/app/kysmindset/security/BootReceiver.java");
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  const posture = read("android/app/src/main/java/app/kysmindset/security/DevicePosture.java");
+  const manifest = read("android/app/src/main/AndroidManifest.xml");
+  assert.match(vpn, /KEY_DESIRED = "vpn_desired"/);
+  assert.match(vpn, /restoreIfDesired/);
+  assert.match(vpn, /setDesired\(this, true\)/);
+  assert.match(vpn, /ACTION_STOP[\s\S]*setDesired\(this, false\)/);
+  assert.match(vpn, /onRevoke\(\)[\s\S]*setDesired\(this, false\)/);
+  assert.match(boot, /KillVpnService\.restoreIfDesired\(context\)/);
+  assert.match(main, /KillVpnService\.restoreIfDesired\(this\)/);
+  assert.match(main, /KillVpnService\.active \? "on" : "denied"/);
+  assert.match(posture, /"vpnDesired"/);
+  assert.match(manifest, /MY_PACKAGE_REPLACED/);
+});
+
+test("scan separates alerts review and weakened protection", () => {
+  const store = read("src/lib/security/store.ts");
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.doesNotMatch(store, /third-party host\$\{snap\.thirdPartyHosts\.length === 1/);
+  assert.match(store, /Review \$\{snap\.thirdPartyHosts\.length\} third-party connection/);
+  assert.match(store, /Android secure screen lock is off/);
+  assert.match(store, /Review unknown hosts/);
+  assert.match(overview, /\? "Review needed"/);
+  assert.match(overview, />Review<\/div>/);
+  assert.match(overview, />Weakened<\/div>/);
+  assert.match(overview, /Interrupted — recovery pending/);
+  assert.doesNotMatch(overview, /Needs review \/ weakened/);
+});

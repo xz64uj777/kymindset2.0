@@ -2,7 +2,7 @@ import { Activity, Radar, RefreshCw, ShieldAlert, ShieldCheck, Terminal, Trash2,
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { isDeviceVpnActive } from "@/lib/native";
+import { readDevicePosture } from "@/lib/native";
 import { useScore, useSecurity } from "@/lib/security/store";
 import { cn, timeAgo } from "@/lib/utils";
 import { Panel, PanelHeader, ScoreTone, StatusDot } from "./chrome";
@@ -28,9 +28,15 @@ export function OverviewPanel() {
   const setTab = useSecurity((s) => s.setTab);
   const score = useScore();
   const tone = ScoreTone(score.status);
-  const [deviceVpn, setDeviceVpn] = useState<boolean | null>(() => isDeviceVpnActive());
+  const initialPosture = readDevicePosture();
+  const [deviceVpn, setDeviceVpn] = useState<boolean | null>(() => initialPosture?.vpnActive ?? null);
+  const [deviceVpnDesired, setDeviceVpnDesired] = useState(() => initialPosture?.vpnDesired ?? false);
   useEffect(() => {
-    const sync = () => setDeviceVpn(isDeviceVpnActive());
+    const sync = () => {
+      const posture = readDevicePosture();
+      setDeviceVpn(posture?.vpnActive ?? null);
+      setDeviceVpnDesired(posture?.vpnDesired ?? false);
+    };
     sync();
     const id = window.setInterval(sync, 1500);
     return () => window.clearInterval(id);
@@ -47,9 +53,11 @@ export function OverviewPanel() {
   const weakenedCount = deepScan?.vulnerabilities.length ?? 0;
   const scanHeadline = threats.length
     ? "Alerts found"
-    : reviewItems.length || weakenedCount
+    : weakenedCount
       ? "Protection weakened"
-      : "No action needed";
+      : reviewItems.length
+        ? "Review needed"
+        : "No action needed";
   const dims = [
     {
       name: "Network Exposure",
@@ -109,8 +117,19 @@ export function OverviewPanel() {
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="rounded-md border border-line bg-elevated p-3">
             <div className="text-2xs uppercase tracking-wide text-subtle">Android · Device VPN</div>
-            <div className={cn("mt-1 text-sm font-semibold", deviceVpn === true ? "text-emerald" : deviceVpn === false ? "text-amber" : "text-muted")}>
-              {deviceVpn === true ? "Active" : deviceVpn === false ? "Inactive" : "Unavailable in this runtime"}
+            <div
+              className={cn(
+                "mt-1 text-sm font-semibold",
+                deviceVpn === true ? "text-emerald" : deviceVpnDesired ? "text-amber" : deviceVpn === false ? "text-muted" : "text-muted",
+              )}
+            >
+              {deviceVpn === true
+                ? "Active"
+                : deviceVpnDesired
+                  ? "Interrupted — recovery pending"
+                  : deviceVpn === false
+                    ? "Inactive"
+                    : "Unavailable in this runtime"}
             </div>
           </div>
           <div className="rounded-md border border-line bg-elevated p-3">
@@ -168,7 +187,7 @@ export function OverviewPanel() {
             title="Scan Results"
             subtitle="Everything that needs a decision stays here"
           />
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-md border border-line bg-elevated p-3">
               <div className="text-2xs uppercase tracking-wide text-subtle">Status</div>
               <div className={cn("mt-1 text-sm font-semibold", threats.length ? "text-rose" : reviewItems.length || weakenedCount ? "text-amber" : "text-emerald")}>
@@ -180,9 +199,15 @@ export function OverviewPanel() {
               <div className={cn("mt-1 text-sm font-semibold", threats.length ? "text-rose" : "text-emerald")}>{threats.length}</div>
             </div>
             <div className="rounded-md border border-line bg-elevated p-3">
-              <div className="text-2xs uppercase tracking-wide text-subtle">Needs review / weakened</div>
-              <div className={cn("mt-1 text-sm font-semibold", reviewItems.length || weakenedCount ? "text-amber" : "text-emerald")}>
-                {reviewItems.length + weakenedCount}
+              <div className="text-2xs uppercase tracking-wide text-subtle">Review</div>
+              <div className={cn("mt-1 text-sm font-semibold", reviewItems.length ? "text-amber" : "text-emerald")}>
+                {reviewItems.length}
+              </div>
+            </div>
+            <div className="rounded-md border border-line bg-elevated p-3">
+              <div className="text-2xs uppercase tracking-wide text-subtle">Weakened</div>
+              <div className={cn("mt-1 text-sm font-semibold", weakenedCount ? "text-amber" : "text-emerald")}>
+                {weakenedCount}
               </div>
             </div>
           </div>

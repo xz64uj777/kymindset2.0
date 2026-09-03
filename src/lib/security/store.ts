@@ -796,9 +796,9 @@ export const useSecurity = create<SecurityState>()(
               severity: "medium",
             });
           if (snap.thirdPartyHosts.length)
-            vulns.push({
-              name: `${snap.thirdPartyHosts.length} third-party host${snap.thirdPartyHosts.length === 1 ? "" : "s"} in this session`,
-              severity: snap.thirdPartyHosts.length > 3 ? "high" : "medium",
+            recs.push({
+              action: `Review ${snap.thirdPartyHosts.length} third-party connection${snap.thirdPartyHosts.length === 1 ? "" : "s"} before allowing`,
+              priority: "medium",
             });
           if (disarmed.length)
             vulns.push({ name: `${disarmed.length} disarmed decoys`, severity: "medium" });
@@ -822,8 +822,10 @@ export const useSecurity = create<SecurityState>()(
             else strengths.push("No common Android root indicators detected");
             if (native.debuggerAttached)
               vulns.push({ name: "Debugger attached to Kysmindset", severity: "high" });
-            if (!native.deviceSecure)
+            if (!native.deviceSecure) {
+              vulns.push({ name: "Android secure screen lock is off", severity: "high" });
               recs.push({ action: "Enable a secure Android screen lock", priority: "high" });
+            }
             if (native.securityPatch) strengths.push(`Android security patch ${native.securityPatch}`);
           }
           if (blocked > 0) strengths.push(`${blocked} hosts already blocked`);
@@ -834,10 +836,10 @@ export const useSecurity = create<SecurityState>()(
             deepScan: {
               assessment:
                 s.score >= 85
-                  ? "This origin is tight. Residual risk is third-party hosts and permissions."
+                  ? "No confirmed scan alerts. Review third-party connections and permissions as needed."
                   : s.score >= 70
-                    ? "Fair posture. Block unknown hosts and keep decoys armed."
-                    : "Elevated posture deductions. Review open traffic and restore protection flags.",
+                    ? "Fair posture. Review unknown hosts and restore any weakened controls."
+                    : "Elevated posture deductions. Review open traffic and restore weakened protection.",
               vulnerabilities: vulns,
               recommendations: recs,
               strengths,

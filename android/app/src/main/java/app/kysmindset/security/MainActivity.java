@@ -114,6 +114,7 @@ public class MainActivity extends FragmentActivity {
         web.addJavascriptInterface(new KysBridge(), "KysAndroid");
         web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html");
         startLockGate();
+        KillVpnService.restoreIfDesired(this);
         handleLockIntent(getIntent());
         handleUpdateIntent(getIntent());
     }
@@ -294,6 +295,7 @@ public class MainActivity extends FragmentActivity {
         super.onResume();
         if (gated) hideSystemBars();
         DeviceOwner.applyLockPolicies(this);
+        KillVpnService.restoreIfDesired(this);
     }
 
     private void sendEvent(String name, String result) {
@@ -323,8 +325,13 @@ public class MainActivity extends FragmentActivity {
 
     private void startVpn() {
         Intent i = new Intent(this, KillVpnService.class);
-        startService(i);
-        sendKill("on");
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
+        else startService(i);
+        if (web != null) {
+            web.postDelayed(() -> sendKill(KillVpnService.active ? "on" : "denied"), 600L);
+        } else {
+            sendKill(KillVpnService.active ? "on" : "denied");
+        }
     }
 
     private void stopVpn() {
