@@ -22,7 +22,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Apply live scan visibility checkpoint
+      - name: Apply live scan visibility checkpoint v2
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
