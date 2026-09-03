@@ -321,3 +321,13 @@ test("app-initiated Android system UI cannot trip the lock gate", () => {
   assert.doesNotMatch(main, /suppressNextPauseGate/);
   assert.match(native, /}, 5000\);/);
 });
+
+
+test("actions use explicit review destinations", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.match(overview, /Review connections \(\{connectionReview\.length\}\)/);
+  assert.match(overview, /Review alerts \(\{threats\.length\}\)/);
+  assert.match(overview, /setTab\("network"\)/);
+  assert.match(overview, /=== "Scan Results"/);
+  assert.doesNotMatch(overview, /tap to review hosts/i);
+});

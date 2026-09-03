@@ -353,6 +353,7 @@ function QuickActions() {
   const activities = useSecurity((s) => s.activities);
   const pending = activities.filter((a) => a.status === "suspicious" || a.status === "unknown");
   const threats = activities.filter((a) => a.status === "suspicious");
+  const connectionReview = pending.filter((a) => a.type === "traffic");
   const resolved = activities.filter(
     (a) => a.status === "blocked" || a.status === "killed" || a.status === "resolved",
   ).length;
@@ -404,14 +405,35 @@ function QuickActions() {
   return (
     <Panel>
       <PanelHeader icon={<Activity className="size-4" />} title="Actions" subtitle="One-tap operations" iconClass="bg-elevated text-muted" />
-      {pending.length > 0 ? (
-        <button
-          type="button"
-          onClick={() => setTab("network")}
-          className="mb-3 w-full rounded-md border border-rose/25 bg-rose-dim/40 px-3 py-2 text-left text-xs text-rose"
-        >
-          Open items are on Network — tap to review hosts
-        </button>
+      {connectionReview.length > 0 || threats.length > 0 ? (
+        <div className="mb-3 rounded-md border border-amber/20 bg-amber-dim/20 p-3">
+          <div className="mb-2 text-xs font-semibold text-fg">Review needed</div>
+          <div className="flex flex-wrap gap-2">
+            {connectionReview.length > 0 ? (
+              <Button size="sm" variant="outline" onClick={() => setTab("network")}>
+                Review connections ({connectionReview.length})
+              </Button>
+            ) : null}
+            {threats.length > 0 ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setTab("overview");
+                  window.setTimeout(() => {
+                    const sections = Array.from(document.querySelectorAll("section"));
+                    const target = sections.find(
+                      (section) => section.querySelector("h3")?.textContent?.trim() === "Scan Results",
+                    );
+                    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 0);
+                }}
+              >
+                Review alerts ({threats.length})
+              </Button>
+            ) : null}
+          </div>
+        </div>
       ) : null}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {actions.map((a) => {
