@@ -18,6 +18,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Apply explicit post-scan review actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/clarify_review_actions.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/security/overview-panel.tsx tests/security-contract.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m "Use explicit review connections and alerts actions [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Validate source tree
         shell: bash
         run: |
