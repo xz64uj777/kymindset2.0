@@ -45,29 +45,25 @@ new_scan_tail = '''        <p className="mt-3 text-micro text-muted">
       </Panel>
       {lastScan ? (
 '''
-if old_scan_tail not in text:
+if old_scan_tail in text:
+    text = text.replace(old_scan_tail, new_scan_tail, 1)
+elif 'Live scan' not in text:
     raise SystemExit('security scan insertion point not found')
-text = text.replace(old_scan_tail, new_scan_tail, 1)
 
 old_standalone = '''      <Panel>
         <PanelHeader icon={<Terminal className="size-4" />} title="Live feed" subtitle="Engine output while a scan runs" />
         <ScanFeed log={scanLog} scanning={scanning} />
       </Panel>
 '''
-if old_standalone not in text:
-    raise SystemExit('standalone live feed panel not found')
-text = text.replace(old_standalone, '', 1)
+if old_standalone in text:
+    text = text.replace(old_standalone, '', 1)
 
 text = text.replace(
     'className="max-h-72 overflow-y-auto rounded-lg border border-line bg-bg/60 px-3 py-2 font-mono text-2xs"',
     'className={cn("overflow-y-auto rounded-lg border bg-bg/70 px-3 py-2 font-mono text-2xs", scanning ? "max-h-80 border-amber/20" : "max-h-44 border-line")}',
     1,
 )
-text = text.replace(
-    'Tap Run Security Analysis — live engine output appears here.',
-    'Run Security Scan — live checks will appear here.',
-    1,
-)
+text = text.replace('Tap Run Security Analysis — live engine output appears here.', 'Run Security Scan — live checks will appear here.', 1)
 text = text.replace(
     'tone={e.kind === "threat" ? "rose" : e.kind === "ok" ? "emerald" : e.kind === "learn" ? "cyan" : "muted"}',
     'tone={e.kind === "threat" ? "rose" : e.kind === "ok" ? "emerald" : e.kind === "learn" ? "amber" : "muted"}',
@@ -78,26 +74,18 @@ text = text.replace(
     'e.kind === "threat" ? "text-rose" : e.kind === "ok" ? "text-emerald" : e.kind === "learn" ? "text-amber" : "text-muted"',
     1,
 )
-text = text.replace(
-    '{scanning ? <div className="text-cyan">▌ analyzing…</div> : null}',
-    '{scanning ? <div className="text-amber">▌ working…</div> : null}',
-    1,
-)
-text = text.replace(
-    '<div className="h-full rounded-full bg-cyan" style={{ width: `${d.value}%` }} />',
-    '<div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${d.value}%` }} />',
-    1,
-)
-text = text.replace(
-    'color: "text-cyan border-cyan/20 bg-cyan-dim hover:bg-cyan/20",',
-    'color: "text-muted border-line bg-elevated hover:bg-white/10",',
-    1,
-)
-
+text = text.replace('{scanning ? <div className="text-cyan">▌ analyzing…</div> : null}', '{scanning ? <div className="text-amber">▌ working…</div> : null}', 1)
+text = text.replace('<div className="h-full rounded-full bg-cyan" style={{ width: `${d.value}%` }} />', '<div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${d.value}%` }} />', 1)
+text = text.replace('color: "text-cyan border-cyan/20 bg-cyan-dim hover:bg-cyan/20",', 'color: "text-muted border-line bg-elevated hover:bg-white/10",', 1)
 OVERVIEW.write_text(text)
 
 tests = TESTS.read_text()
+tests = tests.replace(
+    "const resultsEnd = overview.indexOf('title=\"Live feed\"', resultsStart);",
+    "const resultsEnd = overview.indexOf('<QuickActions />', resultsStart);",
+    1,
+)
 marker = 'live scan stays inside the security scan flow'
 if marker not in tests:
     tests += '''\n\ntest("live scan stays inside the security scan flow", () => {\n  const overview = read("src/components/security/overview-panel.tsx");\n  assert.match(overview, /Live scan/);\n  assert.match(overview, /ScanFeed log=\\{scanLog\\} scanning=\\{scanning \\|\\| deepScanning\\}/);\n  assert.doesNotMatch(overview, /title="Live feed"/);\n  assert.match(overview, /Last scan log/);\n  assert.match(overview, /e.kind === "learn" \\? "amber"/);\n});\n'''
-    TESTS.write_text(tests)
+TESTS.write_text(tests)
