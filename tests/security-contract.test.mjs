@@ -248,7 +248,7 @@ test("manual review remains separate from automatic containment", () => {
   assert.match(overview, /Review all manually/);
   assert.match(overview, /setTab\("network"\)/);
   const resultsStart = overview.indexOf('title="Scan Results"');
-  const resultsEnd = overview.indexOf('title="Live feed"', resultsStart);
+  const resultsEnd = overview.indexOf('<QuickActions />', resultsStart);
   assert.ok(resultsStart >= 0 && resultsEnd > resultsStart);
   const results = overview.slice(resultsStart, resultsEnd);
   assert.doesNotMatch(results, /toggleLockdown/);
