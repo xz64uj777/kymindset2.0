@@ -18,21 +18,6 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Fix updater installer callback
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/fix_update_install_callback.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add android/app/src/main/java/app/kysmindset/security/MainActivity.java android/app/src/main/java/app/kysmindset/security/AppUpdate.java tests/security-contract.test.mjs
-          if ! git diff --cached --quiet; then
-            git commit -m "Handle Android installer confirmation for self-update [skip ci]"
-            git push origin HEAD:main
-          fi
-
       - name: Validate source tree
         shell: bash
         run: |
