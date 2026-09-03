@@ -368,7 +368,11 @@ test("native VPN desired state survives service lifecycle", () => {
 test("scan separates alerts review and weakened protection", () => {
   const store = read("src/lib/security/store.ts");
   const overview = read("src/components/security/overview-panel.tsx");
-  assert.doesNotMatch(store, /third-party host\$\{snap\.thirdPartyHosts\.length === 1/);
+  const deepStart = store.indexOf("runDeepScan: () => {");
+  const deepEnd = store.indexOf("patchSettings:", deepStart);
+  assert.ok(deepStart >= 0 && deepEnd > deepStart);
+  const deep = store.slice(deepStart, deepEnd);
+  assert.doesNotMatch(deep, /vulns\.push\(\{[\s\S]*third-party host/i);
   assert.match(store, /Review \$\{snap\.thirdPartyHosts\.length\} third-party connection/);
   assert.match(store, /Android secure screen lock is off/);
   assert.match(store, /Review unknown hosts/);

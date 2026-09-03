@@ -141,6 +141,7 @@ export type DevicePosture = {
   vpnActive: boolean;
   vpnDesired: boolean;
   vpnDesired: boolean;
+  vpnDesired: boolean;
   deviceAdmin: boolean;
   deviceOwner: boolean;
   lockTaskPermitted: boolean;
