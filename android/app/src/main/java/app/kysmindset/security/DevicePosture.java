@@ -98,8 +98,6 @@ final class DevicePosture {
             o.put("emulatorEvidence", emulatorEvidence);
             o.put("vpnActive", KillVpnService.active);
             o.put("vpnDesired", KillVpnService.desired(ctx));
-            o.put("vpnDesired", KillVpnService.desired(ctx));
-            o.put("vpnDesired", KillVpnService.desired(ctx));
             o.put("deviceAdmin", DeviceOwner.isAdmin(ctx));
             o.put("deviceOwner", DeviceOwner.isOwner(ctx));
             o.put("lockTaskPermitted", DeviceOwner.lockTaskPermitted(ctx));
