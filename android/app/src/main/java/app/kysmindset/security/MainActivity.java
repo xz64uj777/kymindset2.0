@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
@@ -114,6 +115,7 @@ public class MainActivity extends FragmentActivity {
         web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html");
         startLockGate();
         handleLockIntent(getIntent());
+        handleUpdateIntent(getIntent());
     }
 
 
@@ -210,11 +212,58 @@ public class MainActivity extends FragmentActivity {
         }
     }
 
+    private void handleUpdateIntent(Intent intent) {
+        if (intent == null || !AppUpdate.ACTION_INSTALLED.equals(intent.getAction())) return;
+        int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            Intent confirm = installerConfirmationIntent(intent);
+            if (confirm != null) {
+                beginExpectedSystemUi();
+                try {
+                    startActivity(confirm);
+                    sendUpdate("{\"state\":\"prompt\",\"pct\":100}");
+                } catch (Exception e) {
+                    endExpectedSystemUi();
+                    sendUpdate(updateErrorJson("Could not open Android installer: " + e.getMessage()));
+                }
+                return;
+            }
+        }
+
+        endExpectedSystemUi();
+        if (status == PackageInstaller.STATUS_SUCCESS) {
+            sendUpdate("{\"state\":\"installed\",\"pct\":100}");
+            return;
+        }
+        String detail = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+        if (detail == null || detail.trim().isEmpty()) detail = "Android installer returned status " + status;
+        sendUpdate(updateErrorJson(detail));
+    }
+
+    @SuppressWarnings("deprecation")
+    private Intent installerConfirmationIntent(Intent result) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            return result.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class);
+        }
+        return (Intent) result.getParcelableExtra(Intent.EXTRA_INTENT);
+    }
+
+    private String updateErrorJson(String message) {
+        JSONObject out = new JSONObject();
+        try {
+            out.put("state", "install-fail");
+            out.put("error", message == null ? "Install failed" : message);
+        } catch (Exception ignored) {
+        }
+        return out.toString();
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
         handleLockIntent(intent);
+        handleUpdateIntent(intent);
     }
 
     private void beginExpectedSystemUi() {

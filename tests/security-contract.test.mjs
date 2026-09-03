@@ -331,3 +331,17 @@ test("actions use explicit review destinations", () => {
   assert.match(overview, /=== "Scan Results"/);
   assert.doesNotMatch(overview, /tap to review hosts/i);
 });
+
+
+test("self-update surfaces Android installer confirmation", () => {
+  const main = read("android/app/src/main/java/app/kysmindset/security/MainActivity.java");
+  const update = read("android/app/src/main/java/app/kysmindset/security/AppUpdate.java");
+  assert.match(main, /PackageInstaller\.EXTRA_STATUS/);
+  assert.match(main, /PackageInstaller\.STATUS_PENDING_USER_ACTION/);
+  assert.match(main, /Intent\.EXTRA_INTENT/);
+  assert.match(main, /startActivity\(confirm\)/);
+  assert.match(main, /handleUpdateIntent\(getIntent\(\)\)/);
+  assert.match(main, /handleUpdateIntent\(intent\)/);
+  assert.match(update, /USER_ACTION_REQUIRED/);
+  assert.doesNotMatch(update, /USER_ACTION_NOT_REQUIRED/);
+});

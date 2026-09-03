@@ -151,7 +151,7 @@ public final class AppUpdate {
             params.setAppPackageName(ctx.getPackageName());
             if (Build.VERSION.SDK_INT >= 31) {
                 params.setRequireUserAction(
-                    PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+                    PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
             }
             int id = installer.createSession(params);
             PackageInstaller.Session session = installer.openSession(id);
