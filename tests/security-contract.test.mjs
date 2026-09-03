@@ -408,3 +408,13 @@ test("scan results separate alerts review and weakened posture", () => {
   assert.match(store, /unknownOpen/);
   assert.doesNotMatch(store, /vulns\.push\(\{ name: .*third-party/i);
 });
+
+
+test("live scan stays inside the security scan flow", () => {
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.match(overview, /Live scan/);
+  assert.match(overview, /ScanFeed log=\{scanLog\} scanning=\{scanning \|\| deepScanning\}/);
+  assert.doesNotMatch(overview, /title="Live feed"/);
+  assert.match(overview, /Last scan log/);
+  assert.match(overview, /e.kind === "learn" \? "amber"/);
+});

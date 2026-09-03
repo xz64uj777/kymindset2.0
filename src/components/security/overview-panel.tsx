@@ -179,6 +179,30 @@ export function OverviewPanel() {
           {connection.secure ? "Secure" : "Insecure"} link
           {killSwitch ? " · Network guard" : ""} · {allowlist.length} trusted · {indicators.length} learned indicators
         </p>
+        <div
+          className={cn(
+            "mt-4 rounded-lg border p-3 transition-colors",
+            scanning || deepScanning
+              ? "border-amber/35 bg-amber-dim/10"
+              : "border-line bg-elevated/40",
+          )}
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="size-4 text-muted" />
+              <span className="text-xs font-semibold text-fg">Live scan</span>
+            </div>
+            <span
+              className={cn(
+                "text-2xs font-medium uppercase tracking-wide",
+                scanning || deepScanning ? "text-amber" : "text-subtle",
+              )}
+            >
+              {scanning ? "Analyzing" : deepScanning ? "Summarizing" : scanLog.length ? "Last scan log" : "Ready"}
+            </span>
+          </div>
+          <ScanFeed log={scanLog} scanning={scanning || deepScanning} />
+        </div>
       </Panel>
       {lastScan ? (
         <Panel>
@@ -283,10 +307,6 @@ export function OverviewPanel() {
           </p>
         </Panel>
       ) : null}
-      <Panel>
-        <PanelHeader icon={<Terminal className="size-4" />} title="Live feed" subtitle="Engine output while a scan runs" />
-        <ScanFeed log={scanLog} scanning={scanning} />
-      </Panel>
       <QuickActions />
       <Panel>
         <PanelHeader
@@ -325,7 +345,7 @@ export function OverviewPanel() {
                 <span className="font-mono text-muted tabular-nums">{d.value}%</span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                <div className="h-full rounded-full bg-cyan" style={{ width: `${d.value}%` }} />
+                <div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${d.value}%` }} />
               </div>
               <p className="mt-1 text-2xs text-subtle">{d.desc}</p>
             </div>
@@ -354,26 +374,26 @@ function ScanFeed({
     el.scrollTop = el.scrollHeight;
   }, [log, scanning]);
   return (
-    <div ref={box} className="max-h-72 overflow-y-auto rounded-lg border border-line bg-bg/60 px-3 py-2 font-mono text-2xs">
+    <div ref={box} className={cn("overflow-y-auto rounded-lg border bg-bg/70 px-3 py-2 font-mono text-2xs", scanning ? "max-h-80 border-amber/20" : "max-h-44 border-line")}>
       {lines.length === 0 && !scanning ? (
-        <p className="py-6 text-center text-subtle">Tap Run Security Analysis — live engine output appears here.</p>
+        <p className="py-6 text-center text-subtle">Run Security Scan — live checks will appear here.</p>
       ) : (
         <div className="space-y-1.5">
           {lines.map((e) => (
             <div key={e.id} className="flex gap-2">
               <StatusDot
-                tone={e.kind === "threat" ? "rose" : e.kind === "ok" ? "emerald" : e.kind === "learn" ? "cyan" : "muted"}
+                tone={e.kind === "threat" ? "rose" : e.kind === "ok" ? "emerald" : e.kind === "learn" ? "amber" : "muted"}
               />
               <span
                 className={
-                  e.kind === "threat" ? "text-rose" : e.kind === "ok" ? "text-emerald" : e.kind === "learn" ? "text-cyan" : "text-muted"
+                  e.kind === "threat" ? "text-rose" : e.kind === "ok" ? "text-emerald" : e.kind === "learn" ? "text-amber" : "text-muted"
                 }
               >
                 {e.message}
               </span>
             </div>
           ))}
-          {scanning ? <div className="text-cyan">▌ analyzing…</div> : null}
+          {scanning ? <div className="text-amber">▌ working…</div> : null}
         </div>
       )}
     </div>
@@ -433,7 +453,7 @@ function QuickActions() {
       key: "refresh",
       label: "Refresh",
       desc: "Reload monitors",
-      color: "text-cyan border-cyan/20 bg-cyan-dim hover:bg-cyan/20",
+      color: "text-muted border-line bg-elevated hover:bg-white/10",
       icon: RefreshCw,
       onClick: refresh,
       disabled: false,
