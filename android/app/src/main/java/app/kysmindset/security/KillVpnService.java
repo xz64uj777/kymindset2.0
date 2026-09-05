@@ -9,7 +9,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.VpnService;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.FileInputStream;
 
@@ -19,10 +24,16 @@ public class KillVpnService extends VpnService {
     public static final String PREFS = "kys";
     public static final String KEY_ALLOW = "vpn_allow";
     public static final String KEY_DESIRED = "vpn_desired";
+    public static final String KEY_EVENTS = "vpn_events";
+    public static final String KEY_RECOVERIES = "vpn_recoveries";
     private static final String CH = "kys-airgap";
     public static volatile boolean active;
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ParcelFileDescriptor tun;
     private volatile boolean running;
+    private boolean recoveryScheduled;
+    private int recoveryBackoffStep;
 
     public static boolean desired(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DESIRED, false);
@@ -32,15 +43,68 @@ public class KillVpnService extends VpnService {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_DESIRED, desired).apply();
     }
 
+    private static synchronized void record(Context context, String event, String detail) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            JSONArray previous;
+            try {
+                previous = new JSONArray(prefs.getString(KEY_EVENTS, "[]"));
+            } catch (Exception ignored) {
+                previous = new JSONArray();
+            }
+            JSONArray next = new JSONArray();
+            JSONObject row = new JSONObject();
+            row.put("at", System.currentTimeMillis());
+            row.put("event", event == null ? "Protection event" : event);
+            row.put("detail", detail == null ? "" : detail);
+            next.put(row);
+            for (int i = 0; i < previous.length() && i < 19; i++) next.put(previous.opt(i));
+            prefs.edit().putString(KEY_EVENTS, next.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static int bumpRecovery(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        int count = prefs.getInt(KEY_RECOVERIES, 0) + 1;
+        prefs.edit().putInt(KEY_RECOVERIES, count).apply();
+        return count;
+    }
+
+    public static JSONObject diagnostics(Context context) {
+        JSONObject out = new JSONObject();
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        try {
+            out.put("active", active);
+            out.put("desired", desired(context));
+            out.put("recoveryAttempts", prefs.getInt(KEY_RECOVERIES, 0));
+            JSONArray events;
+            try {
+                events = new JSONArray(prefs.getString(KEY_EVENTS, "[]"));
+            } catch (Exception ignored) {
+                events = new JSONArray();
+            }
+            out.put("events", events);
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
     public static boolean restoreIfDesired(Context context) {
         if (!desired(context) || active) return active;
         try {
-            if (VpnService.prepare(context) != null) return false;
+            if (VpnService.prepare(context) != null) {
+                record(context, "Recovery blocked", "Android VPN permission is required before protection can resume.");
+                return false;
+            }
+            int attempt = bumpRecovery(context);
+            record(context, "Recovery requested", "Restoring Android VPN protection · attempt " + attempt + ".");
             Intent i = new Intent(context, KillVpnService.class);
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i);
             else context.startService(i);
             return true;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            record(context, "Recovery failed", safeMessage(e, "Android could not start the protection service."));
             return false;
         }
     }
@@ -50,6 +114,8 @@ public class KillVpnService extends VpnService {
         String action = intent != null ? intent.getAction() : null;
         if (ACTION_STOP.equals(action)) {
             setDesired(this, false);
+            recoveryScheduled = false;
+            record(this, "Protection stopped", "Stopped from Kymindset.");
             stopTunnel();
             stopSelf();
             return START_NOT_STICKY;
@@ -58,12 +124,25 @@ public class KillVpnService extends VpnService {
             stopSelf();
             return START_NOT_STICKY;
         }
+
         startForegroundNote();
         if (ACTION_RESTART.equals(action)) stopTunnel();
-        return startTunnel() ? START_STICKY : START_NOT_STICKY;
+        String successEvent = ACTION_RESTART.equals(action)
+            ? "Protection rebuilt"
+            : desired(this) ? "Protection recovered" : "Protection started";
+        boolean started = startTunnel(successEvent);
+        return desired(this) || started ? START_STICKY : START_NOT_STICKY;
     }
 
     private void startForegroundNote() {
+        int nAllow = allowCount();
+        String text = nAllow == 0
+            ? "Protection active · block by default"
+            : "Protection active · " + nAllow + " app" + (nAllow == 1 ? "" : "s") + " allowed";
+        startForegroundNote(text);
+    }
+
+    private void startForegroundNote(String text) {
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (Build.VERSION.SDK_INT >= 26 && nm != null) {
             NotificationChannel ch = new NotificationChannel(CH, "Kysmindset protection", NotificationManager.IMPORTANCE_LOW);
@@ -72,10 +151,6 @@ public class KillVpnService extends VpnService {
         Intent open = new Intent(this, MainActivity.class);
         PendingIntent pi = PendingIntent.getActivity(
             this, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        int nAllow = allowCount();
-        String text = nAllow == 0
-            ? "Protection active · block by default"
-            : "Protection active · " + nAllow + " app" + (nAllow == 1 ? "" : "s") + " allowed";
         Notification.Builder b = Build.VERSION.SDK_INT >= 26
             ? new Notification.Builder(this, CH)
             : new Notification.Builder(this);
@@ -100,7 +175,7 @@ public class KillVpnService extends VpnService {
         return n;
     }
 
-    private boolean startTunnel() {
+    private boolean startTunnel(String successEvent) {
         if (tun != null) return true;
         Builder b = new Builder();
         b.setSession("Kysmindset Air Gap");
@@ -131,32 +206,91 @@ public class KillVpnService extends VpnService {
         b.setBlocking(true);
         try {
             tun = b.establish();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             tun = null;
+            record(this, "Tunnel start failed", safeMessage(e, "Android did not establish the VPN tunnel."));
         }
         if (tun == null) {
             active = false;
-            stopForeground(true);
-            stopSelf();
+            if (desired(this)) {
+                scheduleRecovery("Tunnel establishment failed");
+            } else {
+                stopForeground(true);
+                stopSelf();
+            }
             return false;
         }
+
         setDesired(this, true);
+        recoveryScheduled = false;
+        recoveryBackoffStep = 0;
         running = true;
         active = true;
+        startForegroundNote();
+        record(this, successEvent, "Android VPN tunnel is active · block by default.");
+
+        final ParcelFileDescriptor tunnel = tun;
         Thread t = new Thread(
             () -> {
-                try (FileInputStream in = new FileInputStream(tun.getFileDescriptor())) {
+                String endReason = "Tunnel input closed unexpectedly.";
+                try (FileInputStream in = new FileInputStream(tunnel.getFileDescriptor())) {
                     byte[] buf = new byte[32767];
-                    while (running) {
+                    while (running && tun == tunnel) {
                         int n = in.read(buf);
                         if (n <= 0) break;
                     }
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    endReason = safeMessage(e, "Tunnel input failed unexpectedly.");
+                }
+                final String detail = endReason;
+                if (running && tun == tunnel) {
+                    mainHandler.post(() -> handleUnexpectedTunnelEnd(tunnel, detail));
                 }
             },
             "kys-drop");
         t.start();
         return true;
+    }
+
+    private void handleUnexpectedTunnelEnd(ParcelFileDescriptor ended, String detail) {
+        if (!running || tun != ended) return;
+        running = false;
+        try {
+            ended.close();
+        } catch (Exception ignored) {
+        }
+        tun = null;
+        active = false;
+        record(this, "Protection interrupted", detail);
+        if (desired(this)) scheduleRecovery(detail);
+        else {
+            stopForeground(true);
+            stopSelf();
+        }
+    }
+
+    private void scheduleRecovery(String reason) {
+        if (!desired(this) || recoveryScheduled || active) return;
+        recoveryScheduled = true;
+        long delay = Math.min(30_000L, 1_000L << Math.min(recoveryBackoffStep, 5));
+        recoveryBackoffStep++;
+        startForegroundNote("Protection interrupted · retrying");
+        record(this, "Recovery scheduled", "Retrying in " + Math.max(1L, delay / 1000L) + "s · " + reason);
+        mainHandler.postDelayed(
+            () -> {
+                recoveryScheduled = false;
+                if (!desired(this) || active) return;
+                if (VpnService.prepare(this) != null) {
+                    record(this, "Recovery blocked", "Android VPN permission must be granted again.");
+                    stopForeground(true);
+                    stopSelf();
+                    return;
+                }
+                int attempt = bumpRecovery(this);
+                record(this, "Recovery attempt", "Restarting Android VPN tunnel · attempt " + attempt + ".");
+                startTunnel("Protection recovered");
+            },
+            delay);
     }
 
     private void stopTunnel() {
@@ -171,15 +305,35 @@ public class KillVpnService extends VpnService {
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        if (desired(this) && active) {
+            record(this, "App closed", "Protection remains active in the Android foreground service.");
+        }
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
     public void onDestroy() {
+        boolean recoveryExpected = desired(this) && (running || active);
         stopTunnel();
+        if (recoveryExpected) {
+            record(this, "Service interrupted", "Android stopped the VPN service; sticky recovery is expected.");
+        }
         super.onDestroy();
     }
 
     @Override
     public void onRevoke() {
+        record(this, "VPN permission revoked", "Android revoked Kymindset VPN control. Protection requires permission again.");
         setDesired(this, false);
+        recoveryScheduled = false;
         stopTunnel();
         stopSelf();
+    }
+
+    private static String safeMessage(Exception e, String fallback) {
+        if (e == null || e.getMessage() == null || e.getMessage().trim().isEmpty()) return fallback;
+        String message = e.getMessage().trim();
+        return message.length() > 180 ? message.substring(0, 180) : message;
     }
 }

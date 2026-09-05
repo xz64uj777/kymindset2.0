@@ -119,6 +119,14 @@ export function isNativePromptActive() {
 
 export type DeviceApp = { pkg: string; name: string };
 
+export type ProtectionDiagnosticEvent = { at: number; event: string; detail: string };
+export type ProtectionDiagnostics = {
+  active: boolean;
+  desired: boolean;
+  recoveryAttempts: number;
+  events: ProtectionDiagnosticEvent[];
+};
+
 export type DevicePosture = {
   android: boolean;
   api: number;
@@ -140,6 +148,7 @@ export type DevicePosture = {
   emulatorEvidence: string[];
   vpnActive: boolean;
   vpnDesired: boolean;
+  vpnDiagnostics?: ProtectionDiagnostics;
   deviceAdmin: boolean;
   deviceOwner: boolean;
   lockTaskPermitted: boolean;

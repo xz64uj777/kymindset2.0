@@ -31,11 +31,13 @@ export function OverviewPanel() {
   const initialPosture = readDevicePosture();
   const [deviceVpn, setDeviceVpn] = useState<boolean | null>(() => initialPosture?.vpnActive ?? null);
   const [deviceVpnDesired, setDeviceVpnDesired] = useState(() => initialPosture?.vpnDesired ?? false);
+  const [vpnDiagnostics, setVpnDiagnostics] = useState(() => initialPosture?.vpnDiagnostics ?? null);
   useEffect(() => {
     const sync = () => {
       const posture = readDevicePosture();
       setDeviceVpn(posture?.vpnActive ?? null);
       setDeviceVpnDesired(posture?.vpnDesired ?? false);
+      setVpnDiagnostics(posture?.vpnDiagnostics ?? null);
     };
     sync();
     const id = window.setInterval(sync, 1500);
@@ -143,6 +145,27 @@ export function OverviewPanel() {
             <div className="mt-1 text-sm font-semibold text-fg">{allowlist.length} trusted entries</div>
           </div>
         </div>
+        {vpnDiagnostics?.events?.length ? (
+          <div className="mt-3 rounded-md border border-line bg-elevated/50 p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="text-xs font-semibold text-fg">Protection history</div>
+              <div className="text-2xs text-subtle">Recovery attempts {vpnDiagnostics.recoveryAttempts}</div>
+            </div>
+            <div className="space-y-2">
+              {vpnDiagnostics.events.slice(0, 4).map((event, index) => (
+                <div key={`${event.at}-${event.event}-${index}`} className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={cn("text-2xs font-medium", event.event.includes("interrupted") || event.event.includes("failed") || event.event.includes("revoked") || event.event.includes("blocked") ? "text-amber" : "text-fg")}>
+                      {event.event}
+                    </div>
+                    {event.detail ? <div className="mt-0.5 text-2xs text-subtle">{event.detail}</div> : null}
+                  </div>
+                  <div className="shrink-0 text-2xs text-subtle">{timeAgo(event.at)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={toggleKillSwitch}>
             {killSwitch ? "Stop Protection" : "Start Protection"}

@@ -418,3 +418,27 @@ test("live scan stays inside the security scan flow", () => {
   assert.match(overview, /Last scan log/);
   assert.match(overview, /e.kind === "learn" \? "amber"/);
 });
+
+
+test("vpn tunnel interruption clears active state and schedules recovery", () => {
+  const vpn = read("android/app/src/main/java/app/kysmindset/security/KillVpnService.java");
+  assert.match(vpn, /handleUnexpectedTunnelEnd/);
+  assert.match(vpn, /active = false/);
+  assert.match(vpn, /scheduleRecovery/);
+  assert.match(vpn, /Recovery scheduled/);
+  assert.match(vpn, /START_STICKY/);
+});
+
+test("native protection diagnostics persist lifecycle history", () => {
+  const vpn = read("android/app/src/main/java/app/kysmindset/security/KillVpnService.java");
+  const posture = read("android/app/src/main/java/app/kysmindset/security/DevicePosture.java");
+  const native = read("src/lib/native.ts");
+  const overview = read("src/components/security/overview-panel.tsx");
+  assert.match(vpn, /KEY_EVENTS/);
+  assert.match(vpn, /VPN permission revoked/);
+  assert.match(vpn, /Service interrupted/);
+  assert.match(posture, /vpnDiagnostics/);
+  assert.match(native, /ProtectionDiagnosticEvent/);
+  assert.match(overview, /Protection history/);
+  assert.match(overview, /Recovery attempts/);
+});
