@@ -22,21 +22,6 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Apply protection diagnostics checkpoint
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/apply_protection_diagnostics.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add android/app/src/main/java/app/kysmindset/security/KillVpnService.java android/app/src/main/java/app/kysmindset/security/DevicePosture.java src/lib/native.ts src/components/security/overview-panel.tsx tests/security-contract.test.mjs
-          if ! git diff --cached --quiet; then
-            git commit -m "Add VPN interruption recovery and protection history [skip ci]"
-            git push origin HEAD:main
-          fi
-
       - name: Validate source tree
         shell: bash
         run: |
